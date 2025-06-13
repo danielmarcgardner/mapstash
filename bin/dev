@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+
+# bin/dev: local dev runner (not Docker-based)
+# Runs Rails API + Vite frontend with proxy config
+
+echo "🚀 Starting Rails API on port 3001..."
+(cd . && bundle exec rails s -p 3001) &
+
+echo "🌐 Starting Vite (React) frontend on port 3000..."
+(cd client && npm run dev)
