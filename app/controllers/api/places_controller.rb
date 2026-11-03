@@ -17,7 +17,7 @@ module Api
       if @place.save
         render json: @place, status: :created
       else
-        render json: { errors: @place.errors.full_messages }, status: :unprocessable_entity
+        render json: { errors: @place.errors.full_messages }, status: :unprocessable_content
       end
     rescue ActiveRecord::RecordNotFound
       render json: { error: "List not found" }, status: :not_found
@@ -28,7 +28,7 @@ module Api
       if @place.update(place_params)
         render json: @place, status: :ok
       else
-        render json: { errors: @place.errors.full_messages }, status: :unprocessable_entity
+        render json: { errors: @place.errors.full_messages }, status: :unprocessable_content
       end
     rescue ActiveRecord::RecordNotFound
       render json: { error: "Place not found" }, status: :not_found
@@ -40,7 +40,7 @@ module Api
       if @place.destroy
         head :no_content
       else
-        render json: { errors: @place.errors.full_messages }, status: :unprocessable_entity
+        render json: { errors: @place.errors.full_messages }, status: :unprocessable_content
       end
     rescue ActiveRecord::RecordNotFound
       render json: { error: "Place not found" }, status: :not_found
@@ -51,13 +51,13 @@ module Api
     def place_params
       params.require(:place).permit(:title, :address, :lat, :lng, :description, :link_url, :image_url, :location_name, :notes, :visited)
     rescue ActionController::ParameterMissing
-      render json: { error: "Missing required parameters" }, status: :unprocessable_entity
+      render json: { error: "Missing required parameters" }, status: :unprocessable_content
     rescue ActionController::UnpermittedParameters => e
-      render json: { error: "Unpermitted parameters: #{e.params.join(', ')}" }, status: :unprocessable_entity
+      render json: { error: "Unpermitted parameters: #{e.params.join(', ')}" }, status: :unprocessable_content
     rescue StandardError => e
       render json: { error: "An unexpected error occurred: #{e.message}" }, status: :internal_server_error
     rescue JSON::ParserError
-      render json: { error: "Invalid JSON format" }, status: :unprocessable_entity
+      render json: { error: "Invalid JSON format" }, status: :unprocessable_content
     rescue ActionController::BadRequest
     end
   end

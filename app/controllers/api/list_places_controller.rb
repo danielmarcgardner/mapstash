@@ -11,7 +11,7 @@ module Api
       if @place.save
         render json: @place, status: :created
       else
-        render json: { errors: @place.errors.full_messages }, status: :unprocessable_entity
+        render json: { errors: @place.errors.full_messages }, status: :unprocessable_content
       end
     rescue ActiveRecord::RecordNotFound
       render json: { error: "List not found" }, status: :not_found
@@ -24,7 +24,7 @@ module Api
       if @place.destroy
         head :no_content
       else
-        render json: { errors: @place.errors.full_messages }, status: :unprocessable_entity
+        render json: { errors: @place.errors.full_messages }, status: :unprocessable_content
       end
     rescue ActiveRecord::RecordNotFound
       render json: { error: "List or Place not found" }, status: :not_found

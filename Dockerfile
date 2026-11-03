@@ -9,7 +9,7 @@ RUN npm run build
 # Removed the erroneous COPY referencing a non-existent builder
 
 # === Stage 2: Rails API ===
-FROM ruby:3.2 AS backend
+FROM ruby:4.0.9 AS backend
 WORKDIR /app
 RUN apt-get update -qq && apt-get install -y nodejs postgresql-client
 COPY Gemfile Gemfile.lock ./
