@@ -3,6 +3,7 @@
 # Table name: tags
 #
 #  id         :bigint           not null, primary key
+#  color      :string           default("#c1d5f5"), not null
 #  name       :string
 #  created_at :datetime         not null
 #  updated_at :datetime         not null

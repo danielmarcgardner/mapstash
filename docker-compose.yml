@@ -4,10 +4,10 @@ services:
   backend:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
     command: bash -c "bundle install && rails db:prepare && rails s -b 0.0.0.0"
     ports:
-      - "3001:3000"
+      - "3000:3000"
     volumes:
       - .:/app
     env_file:
@@ -16,19 +16,16 @@ services:
       - db
 
   frontend:
-    build:
-      context: ./client
-    command: npm run dev
-    ports:
-      - "3000:5173"
+    image: node:22
+    working_dir: /client
     volumes:
-      - ./client:/app
-      - /app/node_modules
-    working_dir: /app
+      - ./client:/client
+      - /client/node_modules
+    command: sh -c "npm install && npm run dev -- --host"
+    ports:
+      - "3001:5173"
     environment:
       - CHOKIDAR_USEPOLLING=true
-    depends_on:
-      - backend
 
   db:
     image: postgres:15

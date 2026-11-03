@@ -79,6 +79,7 @@ GEM
       uri (>= 0.13.1)
     annotaterb (4.15.0)
     ast (2.4.3)
+    awesome_print (1.9.2)
     base64 (0.3.0)
     bcrypt (3.1.20)
     bcrypt_pbkdf (1.1.1)
@@ -370,6 +371,7 @@ PLATFORMS
 DEPENDENCIES
   active_model_serializers
   annotaterb
+  awesome_print
   bootsnap
   brakeman
   debug

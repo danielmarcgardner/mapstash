@@ -1,13 +1,30 @@
+#  frozen_string_literal: true
+
 Rails.application.routes.draw do
-  devise_for :users
-  # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
+  devise_for :users,
+  path: "api", # 👈 explicitly sets path
+  path_names: { sign_in: "login", sign_out: "logout", registration: "signup" },
+  controllers: {
+    sessions: "sessions",
+    registrations: "registrations"
+  }
 
-  # Reveal health status on /up that returns 200 if the app boots with no exceptions, otherwise 500.
-  # Can be used by load balancers and uptime monitors to verify that the app is live.
-  get "up" => "rails/health#show", as: :rails_health_check
+  namespace :api do
+    resources :places
+    resources :lists
+    resources :tags do
+      collection do
+        get "add_tag_to_place", to: "tags#add_tag_to_place"
+        get "remove_tag_from_place", to: "tags#remove_tag_from_place"
+      end
+    end
+    get "up" => "rails/health#show", as: :rails_health_check
+    resources :users, only: [ :show, :update ] do
+      collection do
+        get "me", to: "users#me"
+      end
+    end
+  end
 
-  # Defines the root path route ("/")
-  # root "posts#index"
-  #
   root to: redirect("/index.html")
 end
