@@ -12,6 +12,8 @@ Run `docker info >/dev/null 2>&1`. If it fails, ask the user to start Docker Des
 
 Then start the database: `docker-compose up -d db`.
 
+If a build fails with `docker-credential-desktop: executable file not found`, prefix the commands with `export PATH="/Applications/Docker.app/Contents/Resources/bin:$PATH";` (the shell doesn't have Docker Desktop's helpers on PATH).
+
 ## 2. Run the checks
 Run each check and keep its exit code and output. Run all of them even when one fails, so the user sees everything at once.
 
