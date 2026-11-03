@@ -42,14 +42,14 @@ tag_names = [
   'Shopping',
   'Nightlife'
   ]
-tags = tag_names.map { |name| Tag.create!(name: name) }
+tags = tag_names.map { |name| Tag.find_or_create_by!(name: name) }
 
 lists = [
   { title: 'Child Activities', description: 'Good things to do with kids', user_id: user.id },
   { title: 'AirBnbs', description: 'Cool AirBnbs', user_id: user.id },
   { title: 'Destinations', description: 'Things to do in places', user_id: user.id },
   { title: 'Restaurants', description: 'Places to Try', user_id: user.id }
-].map { |attrs| List.create!(attrs) }
+].map { |attrs| List.find_or_create_by!(title: attrs[:title], user_id: attrs[:user_id]) { |l| l.assign_attributes(attrs) } }
 
 places = [
   { title: 'Suwanee Playground', description: 'Fun playground for kids!', link_url: "https://www.instagram.com/reel/DI6VIyYAwG1/?igsh=MWx6bTB2NzF2YjhmZQ==", lat: 34.059531, lng: -84.069953, address: '421 Main St, Suwanee, GA 30024' },
@@ -58,7 +58,7 @@ places = [
   { title: 'Trip to Dahlonega', description: 'Tips for a Trip to Dahlonega', address: "Dahlonega, GA",  lat: 34.533691, lng: -83.983269, link_url: "https://www.instagram.com/reel/DKCECphR4R7/?igsh=bWQ4aTgxZTN3dnE4" },
   { title: 'Sammys Sandwich Shop', description: 'Review for Sammys Sandwich shop!', link_url: "https://www.instagram.com/reel/DK7P0ORsmlK/?igsh=OGwwZjE2aG85aDhi", address: "565 Northside Dr SW Building 2, Atlanta, GA 30310" }
 ].map do |attrs|
-  Place.create!(attrs.merge(user_id: user.id))
+  Place.find_or_create_by!(title: attrs[:title], user_id: user.id) { |p| p.assign_attributes(attrs) }
 end
 
 place_lists = [
@@ -68,7 +68,7 @@ place_lists = [
   { list_id: List.find_by(title: lists[2].title).id, place_id: Place.find_by(title: places[3].title).id }, # Trip to Dahlonega in Destinations
   { list_id: List.find_by(title: lists[3].title).id, place_id: Place.find_by(title: places[4].title).id }  # Sammys Sandwich Shop in Restaurants
 ].map do |attrs|
-  ListPlace.create!(attrs)
+  ListPlace.find_or_create_by!(attrs)
 end
 # Assign tags to places
 place_tags = [
@@ -87,7 +87,7 @@ place_tags = [
   { place_id: Place.find_by(title: places[4].title).id, tag_id: Tag.find_by(name: tags[16].name).id }  # Sammys Sandwich Shop tagged as Restaurant
 
 ].map do |attrs|
-  PlaceTag.create!(attrs)
+  PlaceTag.find_or_create_by!(attrs)
 end
 # Output the created records
 puts "Created #{User.count} user(s)"
