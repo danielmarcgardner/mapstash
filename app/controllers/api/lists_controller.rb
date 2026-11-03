@@ -23,7 +23,7 @@ module Api
       if @list.save
         render json: @list, status: :created
       else
-        render json: { errors: @list.errors.full_messages }, status: :unprocessable_entity
+        render json: { errors: @list.errors.full_messages }, status: :unprocessable_content
       end
     end
 
@@ -32,7 +32,7 @@ module Api
       if @list.update(list_params)
         render json: @list, status: :ok
       else
-        render json: { errors: @list.errors.full_messages }, status: :unprocessable_entity
+        render json: { errors: @list.errors.full_messages }, status: :unprocessable_content
       end
     end
 

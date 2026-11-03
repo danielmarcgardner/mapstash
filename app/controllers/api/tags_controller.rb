@@ -14,7 +14,7 @@ module Api
       if @tag.save
         render json: @tag, status: :created
       else
-        render json: { errors: @tag.errors.full_messages }, status: :unprocessable_entity
+        render json: { errors: @tag.errors.full_messages }, status: :unprocessable_content
       end
     end
 
@@ -25,7 +25,7 @@ module Api
       if @place.tags << @tag
         render json: { message: "Tag added to place successfully" }, status: :ok
       else
-        render json: { errors: @place.errors.full_messages }, status: :unprocessable_entity
+        render json: { errors: @place.errors.full_messages }, status: :unprocessable_content
       end
     rescue ActiveRecord::RecordNotFound
       render json: { error: "Tag or Place not found" }, status: :not_found
@@ -37,7 +37,7 @@ module Api
       if @place.tags.delete(@tag)
         render json: { message: "Tag removed from place successfully" }, status: :ok
       else
-        render json: { errors: @place.errors.full_messages }, status: :unprocessable_entity
+        render json: { errors: @place.errors.full_messages }, status: :unprocessable_content
       end
     rescue ActiveRecord::RecordNotFound
       render json: { error: "Tag or Place not found" }, status: :not_found
@@ -48,7 +48,7 @@ module Api
     def tag_params
       params.require(:tag).permit(:name, :color)
     rescue ActionController::ParameterMissing
-      render json: { error: "Missing required parameters" }, status: :unprocessable_entity
+      render json: { error: "Missing required parameters" }, status: :unprocessable_content
     end
   end
 end

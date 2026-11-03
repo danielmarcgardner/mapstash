@@ -16,7 +16,7 @@ class RegistrationsController < Devise::RegistrationsController
     else
       render json: {
         error: resource.errors.full_messages
-      }, status: :unprocessable_entity
+      }, status: :unprocessable_content
     end
   end
 
