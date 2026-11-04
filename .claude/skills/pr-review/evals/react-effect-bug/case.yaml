@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: react-effect-bug
+expected_outcome: |
+  The review requests changes. It flags the useEffect that reads lists but only depends on selectedListId, the createList mutation that won't refresh useGetListsQuery because listApi has no providesTags/invalidatesTags, the missing isError handling with the lists! non-null assertion, and key={i}. Fixes come with concrete code, and suggestion blocks where they're small.
+context:
+  scaffold_script: place-files.sh

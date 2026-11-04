@@ -57,3 +57,6 @@ If it fails, tell the user in one line.
 
 ## 5. Report
 Reply in three lines: the branch pushed, the PR URL (with its base), and the card's new list.
+
+## 6. Hand off
+Ask: "Run `/pr-review <PR number>` to review it?" If the user says yes, run it with the PR number.

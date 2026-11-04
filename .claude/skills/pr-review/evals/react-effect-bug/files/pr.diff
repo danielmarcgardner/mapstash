@@ -1,0 +1,47 @@
+diff --git a/client/src/components/ListsPanel.tsx b/client/src/components/ListsPanel.tsx
+new file mode 100644
+index 0000000..dd1bae1
+--- /dev/null
++++ b/client/src/components/ListsPanel.tsx
+@@ -0,0 +1,41 @@
++import { useEffect, useState } from "react";
++import { Button, Loader, TextInput, Title } from "@mantine/core";
++import { useCreateListMutation, useGetListsQuery } from "../state/api/listApi";
++import type { List } from "../types/list";
++
++type Props = { selectedListId?: string; onSelect: (list: List) => void };
++
++const ListsPanel = ({ selectedListId, onSelect }: Props) => {
++    const { data: lists, isLoading } = useGetListsQuery();
++    const [createList] = useCreateListMutation();
++    const [title, setTitle] = useState("");
++    const [selected, setSelected] = useState<List | undefined>();
++
++    useEffect(() => {
++        setSelected(lists?.find((l) => l.id === selectedListId));
++    }, [selectedListId]);
++
++    const handleCreate = async () => {
++        await createList({ title });
++        setTitle("");
++    };
++
++    if (isLoading) return <Loader />;
++
++    return (
++        <div>
++            <Title order={5} mb="xs">Your Lists</Title>
++            <ul className="mb-4 space-y-2">
++                {lists!.map((list, i) => (
++                    <li key={i} onClick={() => onSelect(list)} className={list.id === selected?.id ? "font-bold" : ""}>
++                        {list.title}
++                    </li>
++                ))}
++            </ul>
++            <TextInput value={title} onChange={(e) => setTitle(e.currentTarget.value)} placeholder="New list" />
++            <Button onClick={handleCreate}>Add</Button>
++        </div>
++    );
++};
++
++export default ListsPanel;

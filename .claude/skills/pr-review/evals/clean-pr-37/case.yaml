@@ -1,0 +1,4 @@
+schema_version: "1.1"
+name: clean-pr-37
+expected_outcome: |
+  The review approves PR #37 (idempotent seeds) with zero Blocking findings. Any suggestions are true and minor, and it doesn't invent problems to look thorough.
