@@ -53,11 +53,7 @@ MapStash is an app for saving your favorite places for future adventures: a Rail
 ```bash
 make check
 ```
-This runs RSpec in the backend container, then ESLint, `tsc` and Vitest in the frontend container. CI runs the same checks, plus RuboCop and Brakeman:
-```bash
-docker-compose run --rm backend bin/rubocop
-docker-compose run --rm backend bin/brakeman --no-pager
-```
+This runs RuboCop, Brakeman and RSpec in the backend container, then ESLint, `tsc` and Vitest in the frontend container: the same checks CI runs.
 
 ## Troubleshooting
 - **`docker-credential-desktop: executable file not found`**: add Docker Desktop's tools to your PATH: `export PATH="/Applications/Docker.app/Contents/Resources/bin:$PATH"`.
