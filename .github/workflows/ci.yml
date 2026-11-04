@@ -5,6 +5,9 @@ on:
   push:
     branches: [ main ]
 
+permissions:
+  contents: read
+
 jobs:
   scan_ruby:
     runs-on: ubuntu-latest
@@ -37,3 +40,53 @@ jobs:
       - name: Lint code for consistent style
         run: bin/rubocop -f github
 
+  tests-typescript:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 22
+
+      - name: Install dependencies and run tests for TypeScript frontend
+        run: |
+          cd client
+          npm install
+          npm test
+
+  tests-ruby:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: .ruby-version
+          bundler-cache: true
+
+      - name: Install dependencies and run tests for Ruby backend
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+          JWT_SECRET_KEY: ci-test-secret-not-used-anywhere-real
+        run: |
+          bundle install
+          bundle exec rails db:prepare RAILS_ENV=test
+          bundle exec rspec
