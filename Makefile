@@ -7,8 +7,8 @@ build: ## Build containers
 	docker-compose build
 
 setup: ## Install backend dependencies, migrate db
-	docker-compose run backend bundle install
-	docker-compose run backend rails db:prepare
+	docker-compose run --rm backend bundle install
+	docker-compose run --rm backend bin/rails db:prepare
 
 console: ## Rails console
 	docker-compose exec backend rails console
@@ -20,7 +20,7 @@ logs: ## Tail logs
 	docker-compose logs -f
 
 seed: ## Seed the database
-	docker-compose exec backend rails db:seed
+	docker-compose run --rm backend bin/rails db:seed
 
 stop: ## Stop containers
 	docker-compose down

@@ -12,7 +12,7 @@ import { theme } from './theme.ts';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <MantineProvider withGlobalStyles withNormalizeCSS theme={theme}>
+    <MantineProvider theme={theme}>
       <Provider store={store}>
         <Notifications />
         <App />
