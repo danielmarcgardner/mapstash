@@ -21,5 +21,7 @@
 require 'rails_helper'
 
 RSpec.describe PlaceTag, type: :model do
-  pending "add some examples to (or delete) #{__FILE__}"
+  it "joins a tag to a place" do
+    expect { PlaceTag.create!(place: create(:place), tag: create(:tag)) }.to change(PlaceTag, :count).by(1)
+  end
 end

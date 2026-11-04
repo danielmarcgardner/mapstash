@@ -51,17 +51,12 @@ MapStash is an app for saving your favorite places for future adventures: a Rail
 ## Running checks
 
 ```bash
-# Backend tests. Override DATABASE_URL: .env points at the dev database.
-docker-compose run --rm -e RAILS_ENV=test \
-  -e DATABASE_URL=postgres://postgres:postgres@db:5432/mapstash_test \
-  backend sh -c "bin/rails db:prepare && bundle exec rspec"
-
-# Backend lint + security scan
+make check
+```
+This runs RSpec in the backend container, then ESLint, `tsc` and Vitest in the frontend container. CI runs the same checks, plus RuboCop and Brakeman:
+```bash
 docker-compose run --rm backend bin/rubocop
 docker-compose run --rm backend bin/brakeman --no-pager
-
-# Client lint + typecheck
-docker-compose run --rm frontend sh -c "npm install && npm run lint && npx tsc -b"
 ```
 
 ## Troubleshooting

@@ -22,5 +22,9 @@ logs: ## Tail logs
 seed: ## Seed the database
 	docker-compose run --rm backend bin/rails db:seed
 
+check: ## Lint, typecheck and test backend and client
+	docker-compose run --rm -e RAILS_ENV=test -e DATABASE_URL=postgres://postgres:postgres@db:5432/mapstash_test backend sh -c "bin/rails db:prepare && bundle exec rspec"
+	docker-compose run --rm frontend sh -c "npm install --no-audit --no-fund && npm run lint && npx tsc -b && npm test"
+
 stop: ## Stop containers
 	docker-compose down

@@ -28,7 +28,7 @@
 #  fk_rails_...  (user_id => users.id)
 #
 class PlaceSerializer < ActiveModel::Serializer
-  attributes :id, :name, :address, :lat, :lng, :description, :image_url, :link_url, :location_name, :notes, :visited, :created_at, :updated_at
+  attributes :id, :title, :address, :lat, :lng, :description, :image_url, :link_url, :location_name, :notes, :visited, :created_at, :updated_at
 
   def address
     object.address || "No address provided"
