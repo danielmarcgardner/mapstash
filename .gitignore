@@ -31,5 +31,6 @@
 # Ignore master key for decrypting credentials and more.
 /config/master.key
 /client/.env
-# Local skill-creator test runs (kept locally, not committed)
+# Local skill-creator test cases and runs (kept locally, not committed)
 .claude/skills/*-workspace/
+.claude/skills/*/evals/

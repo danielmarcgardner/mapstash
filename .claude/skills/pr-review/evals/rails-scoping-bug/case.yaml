@@ -1,6 +1,0 @@
-schema_version: "1.1"
-name: rails-scoping-bug
-expected_outcome: |
-  The review requests changes. It flags as Blocking that bulk_destroy uses an unscoped Place.where(id: params[:ids]), so any user can delete other users' places; it flags the N+1 from has_many :lists and object.lists.count in PlaceSerializer on the index endpoint; and it flags that the new endpoint has no request spec.
-context:
-  scaffold_script: place-files.sh
