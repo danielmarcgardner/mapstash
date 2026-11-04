@@ -22,5 +22,10 @@
 require 'rails_helper'
 
 RSpec.describe ListPlace, type: :model do
-  pending "add some examples to (or delete) #{__FILE__}"
+  it "joins a place to a list" do
+    list = create(:list)
+    place = create(:place, user: list.user)
+
+    expect { list.places << place }.to change(ListPlace, :count).by(1)
+  end
 end

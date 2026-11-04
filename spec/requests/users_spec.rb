@@ -2,7 +2,7 @@ require 'rails_helper'
 
 RSpec.describe "Users", type: :request do
   describe "GET /api/users/me" do
-    let(:user) { User.create!(email: "me@example.com", password: "password123", first_name: "Map", last_name: "Stasher") }
+    let(:user) { create(:user, email: "me@example.com") }
 
     it "returns the signed-in user" do
       get "/api/users/me", headers: auth_headers(user)

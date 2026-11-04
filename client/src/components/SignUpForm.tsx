@@ -44,8 +44,8 @@ export default function Signup() {
             const result = await signup(values).unwrap();
             dispatch(loginSuccess(result));
             navigateToHome();
-        } catch (err: any) {
-            setSubmitError(err?.data?.error || 'Signup failed');
+        } catch (err) {
+            setSubmitError((err as { data?: { error?: string } })?.data?.error || 'Signup failed');
         }
     };
 

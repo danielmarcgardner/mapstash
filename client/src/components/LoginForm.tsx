@@ -44,10 +44,10 @@ export default function Login() {
             console.log('NAVIGATE TO HOME');
             
             navigateToHome();
-        } catch (err: any) {
+        } catch (err) {
             console.log('Login error:', err);
             
-            setSubmitError(err?.data?.error || 'Login failed');
+            setSubmitError((err as { data?: { error?: string } })?.data?.error || 'Login failed');
         }
     };
 

@@ -40,24 +40,28 @@ jobs:
       - name: Lint code for consistent style
         run: bin/rubocop -f github
 
-  tests-typescript:
+  client:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: client
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Set up Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+          cache-dependency-path: client/package-lock.json
 
-      - name: Install dependencies and run tests for TypeScript frontend
-        run: |
-          cd client
-          npm install
-          npm test
+      - run: npm ci
+      - run: npm run lint
+      - run: npx tsc -b
+      - run: npm test
 
-  tests-ruby:
+  test:
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -87,6 +91,5 @@ jobs:
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
           JWT_SECRET_KEY: ci-test-secret-not-used-anywhere-real
         run: |
-          bundle install
-          bundle exec rails db:prepare RAILS_ENV=test
+          bin/rails db:prepare RAILS_ENV=test
           bundle exec rspec

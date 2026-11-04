@@ -51,18 +51,9 @@ MapStash is an app for saving your favorite places for future adventures: a Rail
 ## Running checks
 
 ```bash
-# Backend tests. Override DATABASE_URL: .env points at the dev database.
-docker-compose run --rm -e RAILS_ENV=test \
-  -e DATABASE_URL=postgres://postgres:postgres@db:5432/mapstash_test \
-  backend sh -c "bin/rails db:prepare && bundle exec rspec"
-
-# Backend lint + security scan
-docker-compose run --rm backend bin/rubocop
-docker-compose run --rm backend bin/brakeman --no-pager
-
-# Client lint + typecheck
-docker-compose run --rm frontend sh -c "npm install && npm run lint && npx tsc -b"
+make check
 ```
+This runs RuboCop, Brakeman and RSpec in the backend container, then ESLint, `tsc` and Vitest in the frontend container: the same checks CI runs.
 
 ## Troubleshooting
 - **`docker-credential-desktop: executable file not found`**: add Docker Desktop's tools to your PATH: `export PATH="/Applications/Docker.app/Contents/Resources/bin:$PATH"`.
