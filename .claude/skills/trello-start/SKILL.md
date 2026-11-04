@@ -43,6 +43,14 @@ On approval, spawn another background `haiku` agent the same way, with the In Pr
 - Ask the user to confirm the branch name with `AskUserQuestion` (proposed name as the first option; they can type another through Other), even if it was in the plan, because this is where the name gets fixed.
 - If the working tree has uncommitted changes, say so and ask whether to carry them onto the new branch before creating it.
 - Record the parent branch *before* switching: `parent=$(git branch --show-current)`.
+- **Sync the parent with GitHub before branching from it**, so the new branch starts from the latest merged work:
+  ```bash
+  git fetch origin
+  git pull --ff-only origin "$parent"   # skip if the parent has never been pushed
+  ```
+  - If the parent is `main`, this step is required. A stale `main` means PRs that conflict, or that carry commits already merged.
+  - If `--ff-only` fails, the local parent has commits that aren't on GitHub, or it has diverged. Stop and tell the user what `git log --oneline origin/$parent..$parent` shows, then let them decide (push, rebase or reset). Never force it.
+  - If uncommitted changes block the pull, report that and ask the user how to handle them.
 - Create the branch and save the metadata the later skills read:
   ```bash
   git switch -c <branch>
