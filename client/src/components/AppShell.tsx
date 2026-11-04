@@ -1,8 +1,8 @@
 import { AppShell } from "@mantine/core";
 import Header from "./Header";
-import type { ReactElement } from "react";
+import type { ReactNode } from "react";
 
-const AppShellComponent = ({ children }: { children: ReactElement}) => {
+const AppShellComponent = ({ children }: { children: ReactNode }) => {
     return (
         <AppShell
             header={{

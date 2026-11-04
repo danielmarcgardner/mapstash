@@ -1,5 +1,4 @@
 import { AppShell } from "@mantine/core";
-import { useEffect, useState } from "react";
 import { GoogleMap, LoadScript, Marker } from "@react-google-maps/api";
 import AppShellComponent from "./AppShell";
 import SideBar from "./SideBar";
@@ -16,8 +15,6 @@ const center = {
   };
 
 const Dashboard = () => {
-    const [selectedPlace, setSelectedPlace] = useState(null);
-
     const { data: places, isLoading, isSuccess, isError } = useGetPlacesQuery();
 
 
@@ -39,7 +36,6 @@ const Dashboard = () => {
                                 <Marker
                                     key={place.id}
                                     position={{ lat: place.lat, lng: place.lng }}
-                                    onClick={() => setSelectedPlace(place.title)}
                                     title={place.title}
                                 />
                             ))}

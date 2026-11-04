@@ -9,7 +9,7 @@ export default function AuthLayout({
 }: {
     title: string;
     children: ReactNode;
-    onSubmit: (e: React.FormEvent) => void;
+    onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
 }) {
     return (
         <Box className="max-w-md mx-auto mt-20">

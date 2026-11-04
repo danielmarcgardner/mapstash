@@ -4,6 +4,7 @@ import { type ListState } from '../../types/list';
 const initialState: ListState = {
     isLoading: false,
     isError: false,
+    isSuccess: false,
     lists: [],
     error: null,
 };

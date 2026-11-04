@@ -20,7 +20,7 @@ export const authApi = createApi({
                 body: { user: {  email, password, first_name: firstName, last_name: lastName }}  // Nest parameters under "user"
             })
         }),
-        getCurrentUser: builder.query<User, null>({
+        getCurrentUser: builder.query<User, void>({
             query: () => '/api/users/me'
         })
     })
