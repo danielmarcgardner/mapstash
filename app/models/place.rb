@@ -28,5 +28,6 @@
 class Place < ApplicationRecord
   belongs_to :user
   has_many :list_places, dependent: :destroy
+  has_many :place_tags, dependent: :destroy
   has_many :lists, through: :list_places
 end

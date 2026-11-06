@@ -10,7 +10,7 @@ class RegistrationsController < Devise::RegistrationsController
     resource.save
     if resource.persisted?
       render json: {
-        user: resource,
+        user: UserSerializer.new(resource).as_json,
         token: Warden::JWTAuth::UserEncoder.new.call(resource, :user, nil).first
       }, status: :ok
     else
