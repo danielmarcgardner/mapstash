@@ -7,11 +7,12 @@
 #  name       :string
 #  created_at :datetime         not null
 #  updated_at :datetime         not null
-#  user_id    :bigint
+#  user_id    :bigint           not null
 #
 # Indexes
 #
-#  index_tags_on_user_id  (user_id)
+#  index_tags_on_user_id                 (user_id)
+#  index_tags_on_user_id_and_lower_name  (user_id, lower((name)::text)) UNIQUE
 #
 # Foreign Keys
 #
@@ -19,6 +20,7 @@
 #
 FactoryBot.define do
   factory :tag do
+    user
     sequence(:name) { |n| "Tag #{n}" }
     color { "#c1d5f5" }
   end

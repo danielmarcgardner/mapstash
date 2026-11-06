@@ -44,15 +44,15 @@ RSpec.describe User, type: :model do
       expect([ Place.where(id: place.id), List.where(id: list.id), Tag.where(id: tag.id), ListPlace.where(list_id: list.id), PlaceTag.where(place_id: place.id) ]).to all(be_empty)
     end
 
-    it "keeps other users' data and unowned tags" do
+    it "keeps other users' data" do
       other_place = create(:place, user: other_user)
-      unowned_tag = create(:tag)
-      PlaceTag.create!(place: other_place, tag: unowned_tag)
+      other_tag = create(:tag, user: other_user)
+      PlaceTag.create!(place: other_place, tag: other_tag)
 
       user.destroy!
 
       expect(Place.exists?(other_place.id)).to be(true)
-      expect(Tag.exists?(unowned_tag.id)).to be(true)
+      expect(Tag.exists?(other_tag.id)).to be(true)
       expect(PlaceTag.where(place: other_place).count).to eq(1)
     end
 
