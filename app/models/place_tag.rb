@@ -10,8 +10,9 @@
 #
 # Indexes
 #
-#  index_place_tags_on_place_id  (place_id)
-#  index_place_tags_on_tag_id    (tag_id)
+#  index_place_tags_on_place_id             (place_id)
+#  index_place_tags_on_place_id_and_tag_id  (place_id,tag_id) UNIQUE
+#  index_place_tags_on_tag_id               (tag_id)
 #
 # Foreign Keys
 #

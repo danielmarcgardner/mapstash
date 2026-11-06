@@ -42,7 +42,7 @@ tag_names = [
   'Shopping',
   'Nightlife'
   ]
-tags = tag_names.map { |name| Tag.find_or_create_by!(name: name) }
+tags = tag_names.map { |name| user.tags.find_or_create_by!(name: name) }
 
 lists = [
   { title: 'Child Activities', description: 'Good things to do with kids', user_id: user.id },

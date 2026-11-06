@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_06_153454) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_06_155041) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -46,6 +46,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_06_153454) do
     t.bigint "tag_id", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.index ["place_id", "tag_id"], name: "index_place_tags_on_place_id_and_tag_id", unique: true
     t.index ["place_id"], name: "index_place_tags_on_place_id"
     t.index ["tag_id"], name: "index_place_tags_on_tag_id"
   end
@@ -54,8 +55,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_06_153454) do
     t.string "title"
     t.string "location_name"
     t.string "address"
-    t.decimal "lat"
-    t.decimal "lng"
+    t.decimal "lat", precision: 10, scale: 6
+    t.decimal "lng", precision: 10, scale: 6
     t.text "notes"
     t.string "link_url"
     t.string "image_url"
@@ -64,6 +65,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_06_153454) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.string "description"
+    t.string "google_place_id"
+    t.index ["google_place_id"], name: "index_places_on_google_place_id"
     t.index ["user_id"], name: "index_places_on_user_id"
   end
 
@@ -72,7 +75,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_06_153454) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.string "color", default: "#c1d5f5", null: false
-    t.bigint "user_id"
+    t.bigint "user_id", null: false
+    t.index "user_id, lower((name)::text)", name: "index_tags_on_user_id_and_lower_name", unique: true
     t.index ["user_id"], name: "index_tags_on_user_id"
   end
 
