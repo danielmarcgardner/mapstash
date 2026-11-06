@@ -10,7 +10,7 @@ class RegistrationsController < Devise::RegistrationsController
     resource.save
     if resource.persisted?
       render json: {
-        user: resource,
+        user: UserSerializer.new(resource).as_json,
         token: Warden::JWTAuth::UserEncoder.new.call(resource, :user, nil).first
       }, status: :ok
     else
@@ -18,6 +18,9 @@ class RegistrationsController < Devise::RegistrationsController
         error: resource.errors.full_messages
       }, status: :unprocessable_content
     end
+  rescue ActiveRecord::RecordNotUnique
+    # A concurrent signup can pass validation and still lose the race to the unique email index.
+    render json: { error: [ "Email has already been taken" ] }, status: :unprocessable_content
   end
 
   private

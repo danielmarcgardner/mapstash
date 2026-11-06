@@ -8,7 +8,7 @@ class SessionsController < Devise::SessionsController
 
     if user&.valid_password?(sign_in_params[:password])
       warden.set_user(user)  # ✅ JWT will be dispatched here
-      render json: { user: user, token: request.env["warden-jwt_auth.token"] }, status: :ok
+      render json: { user: UserSerializer.new(user).as_json, token: request.env["warden-jwt_auth.token"] }, status: :ok
     else
       render json: { error: "Invalid email or password" }, status: :unauthorized
     end
@@ -17,9 +17,7 @@ class SessionsController < Devise::SessionsController
   private
 
   def sign_in_params
-    permitted = params.require(:user).permit(:email, :password)
-    Rails.logger.debug "Sign in params: #{permitted.inspect}"
-    permitted
+    params.require(:user).permit(:email, :password)
   end
 
   def respond_to_on_destroy
