@@ -69,6 +69,16 @@ RSpec.describe "Auth", type: :request do
       expect(response.parsed_body["error"]).to include("Email has already been taken")
     end
 
+    it "returns 422 when a concurrent signup beats the validation to the unique index" do
+      create(:user, email: "taken@example.com")
+      allow_any_instance_of(ActiveRecord::Validations::UniquenessValidator).to receive(:validate_each)
+
+      signup(email: "taken@example.com")
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.parsed_body["error"]).to include("Email has already been taken")
+    end
+
     it "returns 422 for a blank email" do
       signup(email: "")
 

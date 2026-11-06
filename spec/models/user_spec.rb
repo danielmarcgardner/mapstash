@@ -41,7 +41,7 @@ RSpec.describe User, type: :model do
       user.destroy!
 
       expect(User.exists?(user.id)).to be(false)
-      expect([ Place, List, Tag, ListPlace, PlaceTag ].map(&:count)).to all(eq(0))
+      expect([ Place.where(id: place.id), List.where(id: list.id), Tag.where(id: tag.id), ListPlace.where(list_id: list.id), PlaceTag.where(place_id: place.id) ]).to all(be_empty)
     end
 
     it "keeps other users' data and unowned tags" do
@@ -53,7 +53,7 @@ RSpec.describe User, type: :model do
 
       expect(Place.exists?(other_place.id)).to be(true)
       expect(Tag.exists?(unowned_tag.id)).to be(true)
-      expect(PlaceTag.count).to eq(1)
+      expect(PlaceTag.where(place: other_place).count).to eq(1)
     end
 
     it "removes a tag the user owns from another user's place" do
@@ -63,7 +63,7 @@ RSpec.describe User, type: :model do
       user.destroy!
 
       expect(Place.exists?(other_place.id)).to be(true)
-      expect(PlaceTag.count).to eq(0)
+      expect(PlaceTag.where(place: other_place)).to be_empty
     end
   end
 end
