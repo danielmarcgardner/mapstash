@@ -10,7 +10,7 @@ class CustomFailureApp < Devise::FailureApp
     self.content_type = "application/json"
     Rails.logger.error "Devise failure: #{i18n_message.inspect}"
     self.response_body = {
-      error: i18n_message.presence || "Invalid email or password"
+      errors: [ i18n_message.presence || "Invalid email or password" ]
     }.to_json
   end
 end

@@ -26,6 +26,14 @@ RSpec.describe "Auth", type: :request do
       login(with_password: "wrong-password")
 
       expect(response).to have_http_status(:unauthorized)
+      expect(response.parsed_body).to eq("errors" => [ "Invalid email or password" ])
+    end
+
+    it "returns 400 errors without a user param" do
+      post "/api/login", params: { email: user.email }.to_json, headers: AuthHelpers::JSON_HEADERS
+
+      expect(response).to have_http_status(:bad_request)
+      expect(response.parsed_body["errors"]).to be_present
     end
 
     it "does not log the password" do
@@ -66,7 +74,7 @@ RSpec.describe "Auth", type: :request do
       signup(email: "TAKEN@example.com")
 
       expect(response).to have_http_status(:unprocessable_content)
-      expect(response.parsed_body["error"]).to include("Email has already been taken")
+      expect(response.parsed_body["errors"]).to include("Email has already been taken")
     end
 
     it "returns 422 when a concurrent signup beats the validation to the unique index" do
@@ -76,14 +84,57 @@ RSpec.describe "Auth", type: :request do
       signup(email: "taken@example.com")
 
       expect(response).to have_http_status(:unprocessable_content)
-      expect(response.parsed_body["error"]).to include("Email has already been taken")
+      expect(response.parsed_body["errors"]).to include("Email has already been taken")
     end
 
     it "returns 422 for a blank email" do
       signup(email: "")
 
       expect(response).to have_http_status(:unprocessable_content)
-      expect(response.parsed_body).to have_key("error")
+      expect(response.parsed_body["errors"]).to be_present
+    end
+  end
+
+  describe "GET /api/users/me without a token" do
+    it "returns 401 errors from the failure app" do
+      get "/api/users/me", headers: AuthHelpers::JSON_HEADERS
+
+      expect(response).to have_http_status(:unauthorized)
+      expect(response.parsed_body.keys).to eq([ "errors" ])
+      expect(response.parsed_body["errors"]).to all(be_a(String).and(be_present))
+    end
+  end
+
+  describe "DELETE /api/logout" do
+    it "returns 204 and revokes the token" do
+      headers = auth_headers(create(:user))
+
+      delete "/api/logout", headers: headers
+      expect(response).to have_http_status(:no_content)
+
+      get "/api/users/me", headers: headers
+      expect(response).to have_http_status(:unauthorized)
+    end
+  end
+
+  describe "PUT /api/signup" do
+    it "updates the account with the current password" do
+      user = create(:user)
+
+      put "/api/signup", params: { user: { email: "changed@example.com", current_password: "password123" } }.to_json, headers: auth_headers(user)
+
+      expect(response).to have_http_status(:no_content)
+      expect(user.reload.email).to eq("changed@example.com")
+    end
+
+    it "returns 422 errors as an array for a wrong current password" do
+      user = create(:user)
+
+      put "/api/signup", params: { user: { email: "changed@example.com", current_password: "wrong" } }.to_json, headers: auth_headers(user)
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.parsed_body).to eq("errors" => [ "Current password is invalid" ])
+      expect(user.reload.email).not_to eq("changed@example.com")
     end
   end
 end

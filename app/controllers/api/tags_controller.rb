@@ -27,8 +27,6 @@ module Api
       else
         render json: { errors: @place.errors.full_messages }, status: :unprocessable_content
       end
-    rescue ActiveRecord::RecordNotFound
-      render json: { error: "Tag or Place not found" }, status: :not_found
     end
 
     def remove_tag_from_place
@@ -39,16 +37,12 @@ module Api
       else
         render json: { errors: @place.errors.full_messages }, status: :unprocessable_content
       end
-    rescue ActiveRecord::RecordNotFound
-      render json: { error: "Tag or Place not found" }, status: :not_found
     end
 
     private
 
     def tag_params
       params.require(:tag).permit(:name, :color)
-    rescue ActionController::ParameterMissing
-      render json: { error: "Missing required parameters" }, status: :unprocessable_content
     end
   end
 end

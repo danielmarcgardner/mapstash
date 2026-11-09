@@ -7,6 +7,7 @@ import { useLoginMutation } from '../state/api/authApi';
 import { loginSuccess } from '../state/slices/authSlice';
 import AuthLayout from './AuthLayout';
 import { HOME, SIGNUP } from '../constants/routes';
+import type { AuthError } from '../types/user';
 
 export default function Login() {
     const [login, loginStatus] = useLoginMutation();
@@ -47,7 +48,7 @@ export default function Login() {
         } catch (err) {
             console.log('Login error:', err);
             
-            setSubmitError((err as { data?: { error?: string } })?.data?.error || 'Login failed');
+            setSubmitError((err as { data?: AuthError })?.data?.errors?.join(' ') || 'Login failed');
         }
     };
 

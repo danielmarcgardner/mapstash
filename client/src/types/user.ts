@@ -27,7 +27,7 @@ type AuthResponse = {
 type LoginResponse = AuthResponse;
 type SignupResponse = AuthResponse;
 type AuthError = {
-    error: string;
+    errors: string[];
 }
 type AuthState = {
     user: User | null;
