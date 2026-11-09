@@ -55,13 +55,6 @@ RSpec.describe "Lists", type: :request do
       list.places << place
     end
 
-    def query_count(&block)
-      count = 0
-      counter = ->(*, payload) { count += 1 unless payload[:name].in?(%w[SCHEMA TRANSACTION]) }
-      ActiveSupport::Notifications.subscribed(counter, "sql.active_record", &block)
-      count
-    end
-
     it "includes each place's tags without a query per list or place" do
       tag = user.tags.create!(name: "Coffee")
       add_tagged_place(user.lists.create!(title: "One"), tag)

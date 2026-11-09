@@ -31,7 +31,7 @@
 #
 class PlaceSerializer < ActiveModel::Serializer
   attributes :id, :title, :address, :lat, :lng, :description, :image_url, :link_url, :location_name, :notes, :visited,
-             :google_place_id, :tags, :created_at, :updated_at
+             :google_place_id, :tags, :list_ids, :created_at, :updated_at
 
   def address
     object.address || "No address provided"
@@ -44,6 +44,10 @@ class PlaceSerializer < ActiveModel::Serializer
 
   def lng
     object.lng&.to_f
+  end
+
+  def list_ids
+    object.list_places.map(&:list_id)
   end
 
   def tags

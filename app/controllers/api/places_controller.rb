@@ -6,7 +6,7 @@ module Api
     before_action :set_place, only: %i[show update destroy]
 
     def index
-      @places = current_user.places.includes(:tags).order(created_at: :desc)
+      @places = current_user.places.includes(:tags, :list_places).order(created_at: :desc)
       render json: @places, status: :ok
     end
 
@@ -15,21 +15,12 @@ module Api
     end
 
     def create
-      @place = current_user.places.new(place_params)
-
-      if @place.save
-        render json: @place, status: :created
-      else
-        render json: { errors: @place.errors.full_messages }, status: :unprocessable_content
-      end
+      @place = current_user.places.new
+      save_place(:created)
     end
 
     def update
-      if @place.update(place_params)
-        render json: @place, status: :ok
-      else
-        render json: { errors: @place.errors.full_messages }, status: :unprocessable_content
-      end
+      save_place(:ok)
     end
 
     def destroy
@@ -43,8 +34,35 @@ module Api
       @place = current_user.places.find(params[:id])
     end
 
+    # Join rows on a saved place are written on assignment, so everything happens in one transaction;
+    # save! or owned! raising RecordInvalid rolls it back and ApplicationController renders the 422.
+    def save_place(status)
+      attrs = place_params
+      tags = owned!(current_user.tags, attrs.delete(:tag_ids), :tag_ids) if attrs.key?(:tag_ids)
+      lists = owned!(current_user.lists, attrs.delete(:list_ids), :list_ids) if attrs.key?(:list_ids)
+
+      Place.transaction do
+        @place.assign_attributes(attrs)
+        @place.tags = tags if tags
+        @place.lists = lists if lists
+        @place.save!
+      end
+      render json: @place, status: status
+    end
+
+    # Records for ids the current user owns; any unknown or foreign id is a 422.
+    def owned!(scope, ids, attribute)
+      ids = ids.compact_blank.uniq
+      records = scope.where(id: ids).to_a
+      return records if records.size == ids.size
+
+      @place.errors.add(attribute, "must all belong to you")
+      raise ActiveRecord::RecordInvalid, @place
+    end
+
     def place_params
-      params.require(:place).permit(:title, :address, :lat, :lng, :description, :link_url, :image_url, :location_name, :notes, :visited, :google_place_id)
+      params.require(:place).permit(:title, :address, :lat, :lng, :description, :link_url, :image_url, :location_name, :notes, :visited,
+                                    :google_place_id, tag_ids: [], list_ids: [])
     end
   end
 end

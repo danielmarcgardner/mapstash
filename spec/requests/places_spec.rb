@@ -171,4 +171,108 @@ RSpec.describe "Places", type: :request do
       expect(Place.exists?(other_place.id)).to be(true)
     end
   end
+
+  describe "tag_ids and list_ids" do
+    let(:user) { create(:user) }
+    let(:other) { create(:user) }
+    let(:coffee) { user.tags.create!(name: "Coffee") }
+    let(:hike) { user.tags.create!(name: "Hike") }
+    let(:favorites) { user.lists.create!(title: "Favorites") }
+    let(:weekend) { user.lists.create!(title: "Weekend") }
+    let(:new_place) { { title: "Sammys", lat: 33.7, lng: -84.4 } }
+
+    def save(method, path, place)
+      send(method, path, params: { place: place }.to_json, headers: auth_headers(user))
+    end
+
+    it "creates a place with the given tags and lists" do
+      save(:post, "/api/places", new_place.merge(tag_ids: [ coffee.id, hike.id ], list_ids: [ favorites.id ]))
+
+      expect(response).to have_http_status(:created)
+      expect(response.parsed_body["tags"].map { |t| t["id"] }).to match_array([ coffee.id, hike.id ])
+      expect(response.parsed_body["list_ids"]).to eq([ favorites.id ])
+      place = Place.find(response.parsed_body["id"])
+      expect(place.tags).to match_array([ coffee, hike ])
+      expect(place.lists).to eq([ favorites ])
+    end
+
+    it "returns 422 for another user's tag and creates nothing" do
+      foreign = other.tags.create!(name: "Coffee")
+
+      expect {
+        save(:post, "/api/places", new_place.merge(tag_ids: [ coffee.id, foreign.id ]))
+      }.not_to change { [ Place.count, PlaceTag.count ] }
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.parsed_body).to eq("errors" => [ "Tag ids must all belong to you" ])
+    end
+
+    it "returns 422 for a missing or non-numeric id" do
+      save(:post, "/api/places", new_place.merge(list_ids: [ 0 ]))
+      expect(response).to have_http_status(:unprocessable_content)
+
+      save(:post, "/api/places", new_place.merge(tag_ids: [ "abc" ]))
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(Place.count).to eq(0)
+    end
+
+    context "with an existing place" do
+      let(:place) { create(:place, user: user, title: "Before") }
+
+      before do
+        place.tags << coffee
+        place.lists << favorites
+      end
+
+      it "removes all tags with tag_ids: [] and leaves lists alone when list_ids is omitted" do
+        save(:patch, "/api/places/#{place.id}", { tag_ids: [] })
+
+        expect(response).to have_http_status(:ok)
+        expect(response.parsed_body["tags"]).to eq([])
+        expect(place.reload.tags).to be_empty
+        expect(place.lists).to eq([ favorites ])
+      end
+
+      it "replaces the lists with the given set" do
+        save(:patch, "/api/places/#{place.id}", { list_ids: [ weekend.id ] })
+
+        expect(response.parsed_body["list_ids"]).to eq([ weekend.id ])
+        expect(place.reload.lists).to eq([ weekend ])
+      end
+
+      it "returns 422 for another user's list and changes nothing" do
+        foreign = other.lists.create!(title: "Favorites")
+
+        save(:patch, "/api/places/#{place.id}", { title: "After", tag_ids: [ hike.id ], list_ids: [ foreign.id ] })
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(response.parsed_body).to eq("errors" => [ "List ids must all belong to you" ])
+        place.reload
+        expect([ place.title, place.tags, place.lists ]).to eq([ "Before", [ coffee ], [ favorites ] ])
+      end
+
+      it "rolls back the new tags when the place itself is invalid" do
+        save(:patch, "/api/places/#{place.id}", { title: "", tag_ids: [ hike.id ] })
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(response.parsed_body).to eq("errors" => [ "Title can't be blank" ])
+        expect(place.reload.tags).to eq([ coffee ])
+      end
+    end
+
+    it "includes list_ids on index without a query per place" do
+      add = lambda do
+        place = create(:place, user: user)
+        place.tags << coffee
+        place.lists << favorites
+      end
+      add.call
+      baseline = query_count { get "/api/places", headers: auth_headers(user) }
+      expect(response.parsed_body.first["list_ids"]).to eq([ favorites.id ])
+
+      2.times { add.call }
+
+      expect(query_count { get "/api/places", headers: auth_headers(user) }).to eq(baseline)
+    end
+  end
 end
