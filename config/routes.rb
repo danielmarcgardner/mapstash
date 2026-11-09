@@ -10,14 +10,11 @@ Rails.application.routes.draw do
   }
 
   namespace :api do
-    resources :places
-    resources :lists
-    resources :tags do
-      collection do
-        get "add_tag_to_place", to: "tags#add_tag_to_place"
-        get "remove_tag_from_place", to: "tags#remove_tag_from_place"
-      end
+    resources :places do
+      resources :tags, only: %i[create destroy], controller: "place_tags"
     end
+    resources :lists
+    resources :tags
     get "up" => "rails/health#show", as: :rails_health_check
     get "users/me", to: "users#me"
   end

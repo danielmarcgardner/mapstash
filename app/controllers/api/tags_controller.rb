@@ -34,27 +34,6 @@ module Api
       head :no_content
     end
 
-    def add_tag_to_place
-      @tag = current_user.tags.find(params[:tag_id])
-      @place = current_user.places.find(params[:place_id])
-
-      if @place.tags << @tag
-        render json: { message: "Tag added to place successfully" }, status: :ok
-      else
-        render json: { errors: @place.errors.full_messages }, status: :unprocessable_content
-      end
-    end
-
-    def remove_tag_from_place
-      @tag = current_user.tags.find(params[:tag_id])
-      @place = current_user.places.find(params[:place_id])
-      if @place.tags.delete(@tag)
-        render json: { message: "Tag removed from place successfully" }, status: :ok
-      else
-        render json: { errors: @place.errors.full_messages }, status: :unprocessable_content
-      end
-    end
-
     private
 
     def set_tag
