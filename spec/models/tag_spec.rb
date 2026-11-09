@@ -25,17 +25,60 @@ RSpec.describe Tag, type: :model do
     expect(build(:tag)).to be_valid
   end
 
+  it "returns the places it's tagged on" do
+    tag = create(:tag)
+    place = create(:place, user: tag.user)
+    PlaceTag.create!(place: place, tag: tag)
+
+    expect(tag.places).to eq([ place ])
+  end
+
+  describe "validations" do
+    let(:user) { create(:user) }
+
+    it "requires a name" do
+      tag = build(:tag, name: "")
+
+      expect(tag).not_to be_valid
+      expect(tag.errors[:name]).to be_present
+    end
+
+    it "rejects a duplicate name for the same user, in any case" do
+      create(:tag, user: user, name: "Coffee")
+
+      expect(build(:tag, user: user, name: "Coffee")).not_to be_valid
+      expect(build(:tag, user: user, name: "COFFEE")).not_to be_valid
+    end
+
+    it "allows the same name for another user" do
+      create(:tag, user: user, name: "Coffee")
+
+      expect(build(:tag, name: "Coffee")).to be_valid
+    end
+
+    it "accepts a 6-digit hex color" do
+      expect(build(:tag, color: "#A1b2C3")).to be_valid
+    end
+
+    it "rejects a color that isn't a 6-digit hex value" do
+      %w[blue #abc abcdef #abcdeg].each do |color|
+        expect(build(:tag, color: color)).not_to be_valid, "expected #{color} to be invalid"
+      end
+    end
+  end
+
+  # These bypass validations to prove the database enforces the same rules.
   describe "database constraints" do
     let(:user) { create(:user) }
 
     before { create(:tag, user: user, name: "Coffee") }
 
     it "rejects the same name twice for one user" do
-      expect { create(:tag, user: user, name: "Coffee") }.to raise_error(ActiveRecord::RecordNotUnique)
+      expect { build(:tag, user: user, name: "Coffee").save(validate: false) }.to raise_error(ActiveRecord::RecordNotUnique)
     end
 
     it "rejects the same name in a different case for one user" do
-      expect { create(:tag, user: user, name: "COFFEE") }.to raise_error(ActiveRecord::RecordNotUnique)
+      expect { build(:tag, user: user, name: "COFFEE").save(validate: false) }.to raise_error(ActiveRecord::RecordNotUnique)
     end
 
     it "lets two users each have a tag with the same name" do

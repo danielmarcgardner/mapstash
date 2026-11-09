@@ -22,4 +22,12 @@
 class ListPlace < ApplicationRecord
   belongs_to :list
   belongs_to :place
+
+  validate :same_owner
+
+  private
+
+  def same_owner
+    errors.add(:place, "must belong to the list's owner") if list && place && list.user_id != place.user_id
+  end
 end

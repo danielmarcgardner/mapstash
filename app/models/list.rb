@@ -11,7 +11,8 @@
 #
 # Indexes
 #
-#  index_lists_on_user_id  (user_id)
+#  index_lists_on_user_id            (user_id)
+#  index_lists_on_user_id_and_title  (user_id,title) UNIQUE
 #
 # Foreign Keys
 #
@@ -21,4 +22,6 @@ class List < ApplicationRecord
   belongs_to :user
   has_many :list_places, dependent: :destroy
   has_many :places, through: :list_places
+
+  validates :title, presence: true, uniqueness: { scope: :user_id }
 end

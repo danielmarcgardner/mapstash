@@ -32,4 +32,21 @@ class Place < ApplicationRecord
   has_many :list_places, dependent: :destroy
   has_many :place_tags, dependent: :destroy
   has_many :lists, through: :list_places
+  has_many :tags, through: :place_tags
+
+  validates :title, presence: true
+  validates :lat, presence: true, numericality: { in: -90..90, allow_nil: true }
+  validates :lng, presence: true, numericality: { in: -180..180, allow_nil: true }
+  validate :link_url_is_http
+
+  private
+
+  def link_url_is_http
+    return if link_url.blank?
+
+    uri = URI.parse(link_url)
+    errors.add(:link_url, "must be an http(s) URL") unless uri.is_a?(URI::HTTP) && uri.host.present?
+  rescue URI::InvalidURIError
+    errors.add(:link_url, "must be an http(s) URL")
+  end
 end
