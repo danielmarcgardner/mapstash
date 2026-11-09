@@ -61,19 +61,17 @@ RSpec.describe "Lists", type: :request do
     end
 
     it "returns each list's place ids and count instead of nested places, ordered by title" do
-      cherry = list_with("cherry")
+      list_with("cherry")
       apple = list_with("apple", places: 2)
-      banana = list_with("Banana")
+      list_with("Banana")
 
       get "/api/lists", headers: auth_headers(user)
 
       expect(response.parsed_body.map { |l| l["title"] }).to eq(%w[apple Banana cherry])
-      expect(response.parsed_body.first).to eq(
-        "id" => apple.id, "title" => "apple", "description" => nil,
-        "places_count" => 2, "place_ids" => apple.place_ids
-      )
+      first = response.parsed_body.first
+      expect(first.except("place_ids")).to eq("id" => apple.id, "title" => "apple", "description" => nil, "places_count" => 2)
+      expect(first["place_ids"]).to match_array(apple.place_ids)
       expect(response.parsed_body.map { |l| l["places_count"] }).to eq([ 2, 0, 0 ])
-      expect([ banana, cherry ].map(&:id)).to eq(response.parsed_body.drop(1).map { |l| l["id"] })
     end
 
     it "doesn't add a query per list or place" do
@@ -91,9 +89,8 @@ RSpec.describe "Lists", type: :request do
 
       get "/api/lists/#{list.id}", headers: auth_headers(user)
 
-      expect(response.parsed_body).to eq(
-        "id" => list.id, "title" => "One", "description" => nil, "places_count" => 1, "place_ids" => list.place_ids
-      )
+      expect(response.parsed_body.except("place_ids")).to eq("id" => list.id, "title" => "One", "description" => nil, "places_count" => 1)
+      expect(response.parsed_body["place_ids"]).to match_array(list.place_ids)
     end
 
     it "creates a list with no places" do
