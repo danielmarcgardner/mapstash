@@ -11,7 +11,8 @@
 #
 # Indexes
 #
-#  index_lists_on_user_id  (user_id)
+#  index_lists_on_user_id            (user_id)
+#  index_lists_on_user_id_and_title  (user_id,title) UNIQUE
 #
 # Foreign Keys
 #
@@ -45,5 +46,11 @@ RSpec.describe List, type: :model do
 
       expect(build(:list, title: "Restaurants")).to be_valid
     end
+  end
+
+  it "rejects a duplicate title for the same user at the database" do
+    list = create(:list)
+
+    expect { build(:list, user: list.user, title: list.title).save(validate: false) }.to raise_error(ActiveRecord::RecordNotUnique)
   end
 end

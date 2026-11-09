@@ -11,7 +11,8 @@
 #
 # Indexes
 #
-#  index_lists_on_user_id  (user_id)
+#  index_lists_on_user_id            (user_id)
+#  index_lists_on_user_id_and_title  (user_id,title) UNIQUE
 #
 # Foreign Keys
 #
