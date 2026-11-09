@@ -62,6 +62,13 @@ RSpec.describe "Auth", type: :request do
       expect(response.parsed_body["errors"]).to include(a_string_starting_with("Password is too short"))
     end
 
+    it "returns 422 with only a blank-password error for a blank password" do
+      post "/api/signup", params: { user: { email: "blank@example.com", password: "" } }.to_json, headers: AuthHelpers::JSON_HEADERS
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.parsed_body).to eq("errors" => [ "Password can't be blank" ])
+    end
+
     it "returns a token that works on /api/users/me" do
       signup(email: "token@example.com")
       token = response.parsed_body["token"]

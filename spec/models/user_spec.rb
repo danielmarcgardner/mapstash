@@ -35,6 +35,13 @@ RSpec.describe User, type: :model do
       expect(user.errors[:password]).to be_present
     end
 
+    it "reports a blank password as blank, not too short" do
+      user = build(:user, password: "")
+
+      expect(user).not_to be_valid
+      expect(user.errors.full_messages).to eq([ "Password can't be blank" ])
+    end
+
     it "accepts a 6-character password" do
       expect(build(:user, password: "abcdef")).to be_valid
     end

@@ -27,9 +27,9 @@ class User < ApplicationRecord
          jwt_revocation_strategy: JwtDenylist
 
   validates :email, presence: true, uniqueness: true
-  validates :encrypted_password, presence: true
-  # Not using :validatable, so enforce config.password_length here.
-  validates :password, length: { within: Devise.password_length }, allow_nil: true
+  # Not using :validatable, so mirror its password rules here (incl. config.password_length).
+  validates :password, presence: true, if: -> { new_record? || !password.nil? }
+  validates :password, length: { within: Devise.password_length }, allow_blank: true
 
   has_many :places, dependent: :destroy
   has_many :tags, dependent: :destroy
