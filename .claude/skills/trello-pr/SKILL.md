@@ -59,4 +59,4 @@ If it fails, tell the user in one line.
 Reply in three lines: the branch pushed, the PR URL (with its base), and the card's new list.
 
 ## 6. Hand off
-Ask: "Run `/pr-review <PR number>` to review it?" If the user says yes, run it with the PR number.
+In chain mode (reached from `/trello-start`), run `/pr-review <PR number>` now; the chain ends with its report. Otherwise ask: "Run `/pr-review <PR number>` to review it?" and run it if the user says yes.

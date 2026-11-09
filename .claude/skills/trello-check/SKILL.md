@@ -40,4 +40,4 @@ The first run may be slow while images build and gems and npm packages install.
 - Never weaken or delete a test to make it pass. If the test looks wrong, ask the user.
 
 ## 4. Hand off
-When everything passes, ask: "Run `/trello-commit`?" Run it if they say yes.
+When everything passes: in chain mode (reached from `/trello-start`), run `/trello-commit` now. Otherwise ask: "Run `/trello-commit`?" and run it if they say yes. If a check still fails after fixing what this branch caused, stop and report.
