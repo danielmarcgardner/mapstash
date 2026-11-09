@@ -24,11 +24,16 @@ RSpec.describe "Lists", type: :request do
   describe "errors" do
     let(:user) { create(:user) }
 
-    it "returns 404 errors for another user's list" do
-      get "/api/lists/#{create(:list).id}", headers: auth_headers(user)
+    it "returns 404 errors for another user's list on show and update" do
+      foreign = create(:list, title: "Theirs")
 
+      get "/api/lists/#{foreign.id}", headers: auth_headers(user)
       expect(response).to have_http_status(:not_found)
       expect(response.parsed_body).to eq("errors" => [ "List not found" ])
+
+      patch "/api/lists/#{foreign.id}", params: { list: { title: "Mine" } }.to_json, headers: auth_headers(user)
+      expect(response).to have_http_status(:not_found)
+      expect(foreign.reload.title).to eq("Theirs")
     end
 
     it "returns 422 errors for a blank title" do
@@ -46,35 +51,93 @@ RSpec.describe "Lists", type: :request do
     end
   end
 
-  describe "nested places" do
+  describe "list shape" do
     let(:user) { create(:user) }
 
-    def add_tagged_place(list, tag)
-      place = create(:place, user: user)
-      place.tags << tag
-      list.places << place
+    def list_with(title, places: 0)
+      user.lists.create!(title: title).tap do |list|
+        places.times { list.places << create(:place, user: user) }
+      end
     end
 
-    it "includes each place's tags without a query per list or place" do
-      tag = user.tags.create!(name: "Coffee")
-      add_tagged_place(user.lists.create!(title: "One"), tag)
+    it "returns each list's place ids and count instead of nested places, ordered by title" do
+      list_with("cherry")
+      apple = list_with("apple", places: 2)
+      list_with("Banana")
+
+      get "/api/lists", headers: auth_headers(user)
+
+      expect(response.parsed_body.map { |l| l["title"] }).to eq(%w[apple Banana cherry])
+      first = response.parsed_body.first
+      expect(first.except("place_ids")).to eq("id" => apple.id, "title" => "apple", "description" => nil, "places_count" => 2)
+      expect(first["place_ids"]).to match_array(apple.place_ids)
+      expect(response.parsed_body.map { |l| l["places_count"] }).to eq([ 2, 0, 0 ])
+    end
+
+    it "doesn't add a query per list or place" do
+      list_with("One", places: 1)
       baseline = query_count { get "/api/lists", headers: auth_headers(user) }
 
-      expect(response.parsed_body.first["places"].first["tags"].map { |t| t["name"] }).to eq([ "Coffee" ])
-
-      second = user.lists.create!(title: "Two")
-      2.times { add_tagged_place(second, tag) }
+      list_with("Two", places: 2)
+      list_with("Three", places: 3)
 
       expect(query_count { get "/api/lists", headers: auth_headers(user) }).to eq(baseline)
     end
 
-    it "includes the tags on GET /api/lists/:id" do
-      list = user.lists.create!(title: "One")
-      add_tagged_place(list, user.tags.create!(name: "Coffee"))
+    it "returns the same shape on GET /api/lists/:id" do
+      list = list_with("One", places: 1)
 
       get "/api/lists/#{list.id}", headers: auth_headers(user)
 
-      expect(response.parsed_body["places"].first["tags"].map { |t| t["name"] }).to eq([ "Coffee" ])
+      expect(response.parsed_body.except("place_ids")).to eq("id" => list.id, "title" => "One", "description" => nil, "places_count" => 1)
+      expect(response.parsed_body["place_ids"]).to match_array(list.place_ids)
+    end
+
+    it "creates a list with no places" do
+      post "/api/lists", params: { list: { title: "New", description: "Fresh" } }.to_json, headers: auth_headers(user)
+
+      expect(response).to have_http_status(:created)
+      expect(response.parsed_body).to include("title" => "New", "description" => "Fresh", "places_count" => 0, "place_ids" => [])
+    end
+
+    it "updates the title" do
+      list = list_with("Old")
+
+      patch "/api/lists/#{list.id}", params: { list: { title: "New" } }.to_json, headers: auth_headers(user)
+
+      expect(response).to have_http_status(:ok)
+      expect(response.parsed_body["title"]).to eq("New")
+      expect(list.reload.title).to eq("New")
+    end
+  end
+
+  describe "DELETE /api/lists/:id" do
+    let(:user) { create(:user) }
+
+    it "deletes the list and its memberships but keeps the places" do
+      list = user.lists.create!(title: "Gone")
+      kept = user.lists.create!(title: "Kept")
+      only_here = create(:place, user: user)
+      shared = create(:place, user: user)
+      list.places << [ only_here, shared ]
+      kept.places << shared
+
+      delete "/api/lists/#{list.id}", headers: auth_headers(user)
+
+      expect(response).to have_http_status(:no_content)
+      expect(List.exists?(list.id)).to be(false)
+      expect(ListPlace.where(list_id: list.id)).to be_empty
+      expect(Place.where(id: [ only_here.id, shared.id ]).count).to eq(2)
+      expect(kept.reload.places).to eq([ shared ])
+    end
+
+    it "returns 404 for another user's list and keeps it" do
+      foreign = create(:list)
+
+      delete "/api/lists/#{foreign.id}", headers: auth_headers(user)
+
+      expect(response).to have_http_status(:not_found)
+      expect(List.exists?(foreign.id)).to be(true)
     end
   end
 end
