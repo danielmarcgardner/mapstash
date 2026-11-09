@@ -21,7 +21,14 @@
 #  fk_rails_...  (user_id => users.id)
 #
 class ListSerializer < ActiveModel::Serializer
-  attributes :id, :title, :description, :created_at, :updated_at
+  attributes :id, :title, :description, :places_count, :place_ids
 
-  has_many :places, serializer: PlaceSerializer
+  # Read the preloaded join rows; the client already has the places from /api/places.
+  def place_ids
+    object.list_places.map(&:place_id)
+  end
+
+  def places_count
+    object.list_places.size
+  end
 end

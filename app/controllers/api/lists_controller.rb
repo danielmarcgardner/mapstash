@@ -7,7 +7,7 @@ module Api
 
     # GET /api/lists
     def index
-      @lists = current_user.lists.includes(places: [ :tags, :list_places ])
+      @lists = current_user.lists.includes(:list_places).order(Arel.sql("LOWER(lists.title)"), :id)
       render json: @lists, status: :ok
     end
 
@@ -45,7 +45,7 @@ module Api
     private
 
     def set_list
-      @list = current_user.lists.includes(places: [ :tags, :list_places ]).find(params[:id])
+      @list = current_user.lists.find(params[:id])
     end
 
     def list_params
