@@ -283,4 +283,86 @@ RSpec.describe "Places", type: :request do
       expect(query_count { get "/api/places", headers: auth_headers(user) }).to eq(baseline)
     end
   end
+
+  describe "GET /api/places filters" do
+    let(:user) { create(:user) }
+    let(:other) { create(:user) }
+    let(:coffee) { user.tags.create!(name: "Coffee") }
+    let(:hike) { user.tags.create!(name: "Hike") }
+    let(:scenic) { user.tags.create!(name: "Scenic") }
+    let(:favorites) { user.lists.create!(title: "Favorites") }
+
+    def place_with(tags: [], lists: [], **attrs)
+      create(:place, user: user, **attrs).tap do |place|
+        place.tags << tags
+        place.lists << lists
+      end
+    end
+
+    def ids_for(query)
+      get "/api/places?#{query}", headers: auth_headers(user)
+      expect(response).to have_http_status(:ok)
+      response.parsed_body.map { |p| p["id"] }
+    end
+
+    it "returns places with any of the given tags, newest first, without duplicates" do
+      both = place_with(tags: [ coffee, hike ], created_at: 1.day.ago)
+      hike_only = place_with(tags: [ hike ], created_at: 2.days.ago)
+      coffee_only = place_with(tags: [ coffee ], created_at: 3.days.ago)
+      place_with(tags: [ scenic ])
+
+      expect(ids_for("tag_ids[]=#{coffee.id}&tag_ids[]=#{hike.id}")).to eq([ both.id, hike_only.id, coffee_only.id ])
+    end
+
+    it "still returns every tag on a place matched through one of them" do
+      place_with(tags: [ coffee, scenic ])
+
+      get "/api/places?tag_ids[]=#{coffee.id}", headers: auth_headers(user)
+
+      expect(response.parsed_body.first["tags"].map { |t| t["name"] }).to match_array(%w[Coffee Scenic])
+    end
+
+    it "returns only the given list's places" do
+      listed = place_with(lists: [ favorites ])
+      place_with
+
+      expect(ids_for("list_id=#{favorites.id}")).to eq([ listed.id ])
+    end
+
+    it "requires both when tag_ids and list_id are given" do
+      match = place_with(tags: [ coffee ], lists: [ favorites ])
+      place_with(tags: [ coffee ])
+      place_with(lists: [ favorites ])
+
+      expect(ids_for("tag_ids[]=#{coffee.id}&list_id=#{favorites.id}")).to eq([ match.id ])
+    end
+
+    it "returns no places for another user's tag or list" do
+      place_with(tags: [ coffee ], lists: [ favorites ])
+      foreign_tag = other.tags.create!(name: "Coffee")
+      foreign_list = other.lists.create!(title: "Favorites")
+      create(:place, user: other).tap { |p| p.tags << foreign_tag; p.lists << foreign_list }
+
+      expect(ids_for("tag_ids[]=#{foreign_tag.id}")).to eq([])
+      expect(ids_for("list_id=#{foreign_list.id}")).to eq([])
+    end
+
+    it "returns no places for an id that doesn't exist" do
+      place_with(tags: [ coffee ])
+
+      expect(ids_for("tag_ids[]=0")).to eq([])
+    end
+
+    it "doesn't add a query per place when filtering" do
+      query = "tag_ids[]=#{coffee.id}&list_id=#{favorites.id}"
+      place_with(tags: [ coffee ], lists: [ favorites ])
+      baseline = query_count { get "/api/places?#{query}", headers: auth_headers(user) }
+      expect(response.parsed_body.size).to eq(1)
+
+      2.times { place_with(tags: [ coffee ], lists: [ favorites ]) }
+
+      expect(query_count { get "/api/places?#{query}", headers: auth_headers(user) }).to eq(baseline)
+      expect(response.parsed_body.size).to eq(3)
+    end
+  end
 end
