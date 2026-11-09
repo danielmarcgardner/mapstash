@@ -2,11 +2,16 @@
 name: pr-review
 description: Review a mapstash pull request as a senior Rails + React developer, covering bugs, edge cases, security, performance, readability and maintainability. Posts one GitHub review with inline comments a person can act on and a clear verdict (✅ approved or ❌ changes requested), then notes the verdict on the Trello card. Use for "review PR 38", "review this PR", "code review my branch", "is this PR good to merge", /pr-review, or right after /trello-pr opens a PR.
 argument-hint: <PR number | PR URL | path to .diff> [--dry-run]
+# Run in a fresh subagent so the reviewer never sees the session that wrote the PR.
+context: fork
+agent: general-purpose
 ---
 
 # PR Review
 
 Review a PR like a senior Rails and React developer who has to live with this code: someone who wants it correct, safe and easy to change later, not someone hunting for things to say. A review is useful when every comment is true, explains why it matters, and tells the author what to do.
+
+You run as an independent reviewer with no memory of how this PR was written. Judge it only from the PR, the code and the card. Explanations in the PR description are claims to verify, not facts. Don't edit files, commit or check out branches.
 
 ## 1. Target
 `$ARGUMENTS` is one of:
@@ -107,10 +112,9 @@ Build `review.json` in your scratchpad:
 - **--dry-run:** write `review.json` and a readable `review.md` (the body, followed by each comment under its `path:line`) to the output folder you were given, or to your scratchpad. Don't post.
 
 ## 7. Trello
-If the PR body has a `Trello:` card URL and this isn't a dry run, spawn a background `haiku` agent:
-> Use the Trello MCP tool `trelloWriteCard` action "add_comment" (load it with ToolSearch first), cardId `<card ARI from trelloReadCard>`, text `Review agent: <✅ approved | ❌ changes requested (n blocking)>: <review URL>`. Report only success or the error.
+If the PR body has a `Trello:` card URL and this isn't a dry run, call the Trello MCP tool `trelloWriteCard` yourself (load it with ToolSearch first; you can't spawn agents) with action "add_comment", cardId `<card ARI from trelloReadCard>`, text `Review agent: <✅ approved | ❌ changes requested (n blocking)>: <review URL>`. If it fails, include the error in your report.
 
 The card stays where it is. Whoever merges the PR moves it.
 
 ## 8. Report
-In chat: the verdict, the number of findings by severity, the blocking findings as one line each, and the review URL. If changes were requested, offer to fix the blocking findings on the branch. Fixing happens only when the user asks for it.
+Your final message is returned to the session that invoked you. Include the verdict, the number of findings by severity, the blocking findings as one line each with `path:line`, the review URL, and whether the Trello comment was posted. That session relays it to the user and, if changes were requested, offers to fix the blocking findings. Fixing happens only when the user asks for it.
