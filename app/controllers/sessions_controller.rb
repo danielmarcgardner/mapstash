@@ -20,7 +20,7 @@ class SessionsController < Devise::SessionsController
     params.require(:user).permit(:email, :password)
   end
 
-  def respond_to_on_destroy
+  def respond_to_on_destroy(non_navigational_status: :no_content)
     head :no_content
   end
 end

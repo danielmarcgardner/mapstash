@@ -23,7 +23,17 @@ class RegistrationsController < Devise::RegistrationsController
     render json: { errors: [ "Email has already been taken" ] }, status: :unprocessable_content
   end
 
+  def update
+    super do |resource|
+      # Devise renders errors as a hash keyed by attribute; return the API's array shape instead.
+      return render_errors(resource.errors.full_messages, :unprocessable_content) if resource.errors.any?
+    end
+  end
+
   private
+
+  # Devise would re-sign the user into a session after an update; this API is session-less and uses JWTs.
+  def sign_in_after_change_password? = false
 
   def sign_up_params
     params.require(:user).permit(:email, :password, :password_confirmation, :first_name, :last_name)
