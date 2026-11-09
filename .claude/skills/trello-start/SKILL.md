@@ -35,12 +35,14 @@ Each Acceptance Criteria item maps to a spec or a named verification step.
 
 If the user rejects the plan or asks for changes, revise and present it again. Nothing below runs until they approve.
 
+Approving the plan starts chain mode. **Chain mode:** once the user approves the plan in `/trello-start`, the ticket runs straight through `/trello-check` → `/trello-commit` → `/trello-pr` → `/pr-review` without asking between steps. Stop and ask only when a step fails in a way you can't fix within the ticket's scope, or when a decision is genuinely the user's (ambiguous files to stage, a test that looks wrong, a failing check that exists on the parent too).
+
 ## 4. Move to In Progress (background agent)
 On approval, spawn another background `haiku` agent the same way, with the In Progress list ARI.
 
 ## 5. Create the branch
 - Proposed name: `feature/<slug>`, where the slug is the card name in lowercase kebab-case, ASCII only, at most about 50 characters (e.g. "Add note field to lists API" → `feature/add-note-field-to-lists-api`).
-- Ask the user to confirm the branch name with `AskUserQuestion` (proposed name as the first option; they can type another through Other), even if it was in the plan, because this is where the name gets fixed.
+- Use the branch name from the approved plan; approving the plan confirms it. Ask with `AskUserQuestion` only if the name had to change from what the plan said.
 - If the working tree has uncommitted changes, say so and ask whether to carry them onto the new branch before creating it.
 - Record the parent branch *before* switching: `parent=$(git branch --show-current)`.
 - **Sync the parent with GitHub before branching from it**, so the new branch starts from the latest merged work:
@@ -85,4 +87,4 @@ Summarize in a few lines:
 - the result of the full suite
 - how each Acceptance Criteria item was verified
 
-Then ask: "Run `/trello-check` for the full lint + test pass?" Run it if they say yes.
+Then run `/trello-check` (chain mode). If the full suite failed in a way you couldn't fix, stop and report instead.

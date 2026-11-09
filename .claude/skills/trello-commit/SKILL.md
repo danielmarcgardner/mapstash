@@ -34,4 +34,4 @@ EOF
 If a pre-commit hook fails, fix the problem and make a new commit. Don't use `--no-verify` and don't amend.
 
 ## 4. Hand off
-Show `git log -1 --stat`, then ask: "Run `/trello-pr` to push and open the PR?" Run it if they say yes.
+Show `git log -1 --stat`. In chain mode (reached from `/trello-start`), run `/trello-pr` now. Otherwise ask: "Run `/trello-pr` to push and open the PR?" and run it if they say yes.
