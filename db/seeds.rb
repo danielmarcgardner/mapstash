@@ -13,7 +13,7 @@ tag_names = [
   'Pet Friendly', 'Airbnb', 'Restaurant', 'Bar', 'Hotel', 'Museum', 'Park', 'Beach', 'Landmark', 'Shopping',
   'Nightlife'
 ]
-tags = tag_names.index_with { |name| user.tags.find_or_create_by!(name: name) }
+tags = tag_names.index_with { |name| user.tags.where("lower(name) = ?", name.downcase).first_or_create!(name: name) }
 
 lists = {
   'Child Activities' => 'Good things to do with kids',
