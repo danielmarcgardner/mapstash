@@ -21,4 +21,6 @@ class List < ApplicationRecord
   belongs_to :user
   has_many :list_places, dependent: :destroy
   has_many :places, through: :list_places
+
+  validates :title, presence: true, uniqueness: { scope: :user_id }
 end

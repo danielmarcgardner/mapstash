@@ -28,4 +28,12 @@ RSpec.describe ListPlace, type: :model do
 
     expect { list.places << place }.to change(ListPlace, :count).by(1)
   end
+
+  it "won't add a place to another user's list" do
+    list = create(:list)
+    place = create(:place)
+
+    expect { list.places << place }.to raise_error(ActiveRecord::RecordInvalid)
+    expect(ListPlace.where(list: list)).to be_empty
+  end
 end

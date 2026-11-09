@@ -21,4 +21,8 @@
 class Tag < ApplicationRecord
   belongs_to :user
   has_many :place_tags, dependent: :destroy
+  has_many :places, through: :place_tags
+
+  validates :name, presence: true, uniqueness: { scope: :user_id, case_sensitive: false }
+  validates :color, format: { with: /\A#\h{6}\z/, message: "must be a hex color like #c1d5f5" }
 end

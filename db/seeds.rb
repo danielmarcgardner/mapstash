@@ -56,7 +56,7 @@ places = [
   { title: 'Luxury Cabin', description: 'Couples fancy Airbnb in NC', link_url: "https://www.instagram.com/reel/DIUgWUqhuL2/?igsh=bnVpZ2o0NnpmejI1", address: "Hayesville, NC", lat: 35.045681, lng: -83.818428 },
   { title: 'Winter Trip Guide Greenville', description: 'Things to do in Greenville, SC', address: "Greenville, SC", link_url: "https://www.instagram.com/reel/DE3dPq2JTpQ/?igsh=MW96b25tazVkM3JmaA==", lat: 34.850750, lng: -82.398956 },
   { title: 'Trip to Dahlonega', description: 'Tips for a Trip to Dahlonega', address: "Dahlonega, GA",  lat: 34.533691, lng: -83.983269, link_url: "https://www.instagram.com/reel/DKCECphR4R7/?igsh=bWQ4aTgxZTN3dnE4" },
-  { title: 'Sammys Sandwich Shop', description: 'Review for Sammys Sandwich shop!', link_url: "https://www.instagram.com/reel/DK7P0ORsmlK/?igsh=OGwwZjE2aG85aDhi", address: "565 Northside Dr SW Building 2, Atlanta, GA 30310" }
+  { title: 'Sammys Sandwich Shop', description: 'Review for Sammys Sandwich shop!', link_url: "https://www.instagram.com/reel/DK7P0ORsmlK/?igsh=OGwwZjE2aG85aDhi", address: "565 Northside Dr SW Building 2, Atlanta, GA 30310", lat: 33.746500, lng: -84.407800 }
 ].map do |attrs|
   Place.find_or_create_by!(title: attrs[:title], user_id: user.id) { |p| p.assign_attributes(attrs) }
 end

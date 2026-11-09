@@ -32,5 +32,7 @@ FactoryBot.define do
     user
     sequence(:title) { |n| "Place #{n}" }
     address { "1 Main St" }
+    lat { 34.059531 }
+    lng { -84.069953 }
   end
 end
