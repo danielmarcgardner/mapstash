@@ -10,7 +10,7 @@ class SessionsController < Devise::SessionsController
       warden.set_user(user)  # ✅ JWT will be dispatched here
       render json: { user: UserSerializer.new(user).as_json, token: request.env["warden-jwt_auth.token"] }, status: :ok
     else
-      render json: { error: "Invalid email or password" }, status: :unauthorized
+      render json: { errors: [ "Invalid email or password" ] }, status: :unauthorized
     end
   end
 

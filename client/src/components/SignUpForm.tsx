@@ -7,6 +7,7 @@ import { loginSuccess } from '../state/slices/authSlice';
 import { useSignupMutation } from '../state/api/authApi';
 import AuthLayout from './AuthLayout';
 import { HOME, LOGIN } from '../constants/routes';
+import type { AuthError } from '../types/user';
 
 export default function Signup() {
     const [signup, signupStatus] = useSignupMutation();
@@ -45,7 +46,7 @@ export default function Signup() {
             dispatch(loginSuccess(result));
             navigateToHome();
         } catch (err) {
-            setSubmitError((err as { data?: { error?: string } })?.data?.error || 'Signup failed');
+            setSubmitError((err as { data?: AuthError })?.data?.errors?.join(' ') || 'Signup failed');
         }
     };
 

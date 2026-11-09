@@ -46,8 +46,6 @@ module Api
 
     def set_list
       @list = current_user.lists.find(params[:id])
-    rescue ActiveRecord::RecordNotFound
-      render json: { error: "List not found" }, status: :not_found
     end
 
     def list_params

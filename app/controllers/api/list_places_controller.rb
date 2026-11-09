@@ -13,8 +13,6 @@ module Api
       else
         render json: { errors: @place.errors.full_messages }, status: :unprocessable_content
       end
-    rescue ActiveRecord::RecordNotFound
-      render json: { error: "List not found" }, status: :not_found
     end
 
     def destroy
@@ -26,8 +24,6 @@ module Api
       else
         render json: { errors: @place.errors.full_messages }, status: :unprocessable_content
       end
-    rescue ActiveRecord::RecordNotFound
-      render json: { error: "List or Place not found" }, status: :not_found
     end
 
     private
