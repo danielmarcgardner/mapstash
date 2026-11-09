@@ -7,6 +7,15 @@ module Api
 
     def index
       @places = current_user.places.includes(:tags, :list_places).order(created_at: :desc)
+      # Subqueries, not joins: a join on tags would trim the preloaded tags and duplicate places.
+      if params[:tag_ids].present?
+        tags = current_user.tags.where(id: Array(params[:tag_ids]))
+        @places = @places.where(id: PlaceTag.where(tag: tags).select(:place_id))
+      end
+      if params[:list_id].present?
+        lists = current_user.lists.where(id: params[:list_id])
+        @places = @places.where(id: ListPlace.where(list: lists).select(:place_id))
+      end
       render json: @places, status: :ok
     end
 
