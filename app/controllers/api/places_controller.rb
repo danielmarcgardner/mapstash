@@ -34,8 +34,8 @@ module Api
       @place = current_user.places.find(params[:id])
     end
 
-    # Join rows on a saved place are written on assignment, so everything happens in one transaction;
-    # save! or owned! raising RecordInvalid rolls it back and ApplicationController renders the 422.
+    # Ownership is checked before anything is written. Join rows on a saved place are written on assignment,
+    # so assignment and save! share one transaction; RecordInvalid rolls it back and ApplicationController renders the 422.
     def save_place(status)
       attrs = place_params
       tags = owned!(current_user.tags, attrs.delete(:tag_ids), :tag_ids) if attrs.key?(:tag_ids)
