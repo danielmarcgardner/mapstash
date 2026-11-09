@@ -27,6 +27,32 @@ RSpec.describe User, type: :model do
     expect(build(:user)).to be_valid
   end
 
+  describe "password length" do
+    it "rejects a password shorter than 6 characters" do
+      user = build(:user, password: "abcde")
+
+      expect(user).not_to be_valid
+      expect(user.errors[:password]).to be_present
+    end
+
+    it "reports a blank password as blank, not too short" do
+      user = build(:user, password: "")
+
+      expect(user).not_to be_valid
+      expect(user.errors.full_messages).to eq([ "Password can't be blank" ])
+    end
+
+    it "accepts a 6-character password" do
+      expect(build(:user, password: "abcdef")).to be_valid
+    end
+
+    it "doesn't require the password when updating other fields" do
+      user = User.find(create(:user).id)
+
+      expect(user.update(first_name: "New")).to be(true)
+    end
+  end
+
   describe "#destroy" do
     let(:user) { create(:user) }
     let(:other_user) { create(:user) }
