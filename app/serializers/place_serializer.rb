@@ -30,17 +30,23 @@
 #  fk_rails_...  (user_id => users.id)
 #
 class PlaceSerializer < ActiveModel::Serializer
-  attributes :id, :title, :address, :lat, :lng, :description, :image_url, :link_url, :location_name, :notes, :visited, :created_at, :updated_at
+  attributes :id, :title, :address, :lat, :lng, :description, :image_url, :link_url, :location_name, :notes, :visited,
+             :google_place_id, :tags, :created_at, :updated_at
 
   def address
     object.address || "No address provided"
   end
 
+  # Decimal columns serialize as strings by default; the client expects numbers.
   def lat
-    object.lat || "Not specified"
+    object.lat&.to_f
   end
 
   def lng
-    object.lng || "Not specified"
+    object.lng&.to_f
+  end
+
+  def tags
+    object.tags.map { |tag| { id: tag.id, name: tag.name, color: tag.color } }
   end
 end
