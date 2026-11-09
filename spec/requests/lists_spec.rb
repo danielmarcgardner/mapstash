@@ -45,4 +45,43 @@ RSpec.describe "Lists", type: :request do
       expect(response.parsed_body["errors"]).to be_present
     end
   end
+
+  describe "nested places" do
+    let(:user) { create(:user) }
+
+    def add_tagged_place(list, tag)
+      place = create(:place, user: user)
+      place.tags << tag
+      list.places << place
+    end
+
+    def query_count(&block)
+      count = 0
+      counter = ->(*, payload) { count += 1 unless payload[:name].in?(%w[SCHEMA TRANSACTION]) }
+      ActiveSupport::Notifications.subscribed(counter, "sql.active_record", &block)
+      count
+    end
+
+    it "includes each place's tags without a query per list or place" do
+      tag = user.tags.create!(name: "Coffee")
+      add_tagged_place(user.lists.create!(title: "One"), tag)
+      baseline = query_count { get "/api/lists", headers: auth_headers(user) }
+
+      expect(response.parsed_body.first["places"].first["tags"].map { |t| t["name"] }).to eq([ "Coffee" ])
+
+      second = user.lists.create!(title: "Two")
+      2.times { add_tagged_place(second, tag) }
+
+      expect(query_count { get "/api/lists", headers: auth_headers(user) }).to eq(baseline)
+    end
+
+    it "includes the tags on GET /api/lists/:id" do
+      list = user.lists.create!(title: "One")
+      add_tagged_place(list, user.tags.create!(name: "Coffee"))
+
+      get "/api/lists/#{list.id}", headers: auth_headers(user)
+
+      expect(response.parsed_body["places"].first["tags"].map { |t| t["name"] }).to eq([ "Coffee" ])
+    end
+  end
 end

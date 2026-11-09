@@ -7,7 +7,7 @@ module Api
 
     # GET /api/lists
     def index
-      @lists = current_user.lists
+      @lists = current_user.lists.includes(places: :tags)
       render json: @lists, status: :ok
     end
 
@@ -45,7 +45,7 @@ module Api
     private
 
     def set_list
-      @list = current_user.lists.find(params[:id])
+      @list = current_user.lists.includes(places: :tags).find(params[:id])
     end
 
     def list_params

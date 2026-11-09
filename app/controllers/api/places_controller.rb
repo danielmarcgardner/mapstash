@@ -3,14 +3,19 @@
 module Api
   class PlacesController < ApplicationController
     before_action :authenticate_user!
+    before_action :set_place, only: %i[show update destroy]
 
     def index
-      @places = current_user.places.order(created_at: :desc)
+      @places = current_user.places.includes(:tags).order(created_at: :desc)
       render json: @places, status: :ok
     end
 
+    def show
+      render json: @place, status: :ok
+    end
+
     def create
-      @list = current_user.places.new(place_params)
+      @place = current_user.places.new(place_params)
 
       if @place.save
         render json: @place, status: :created
@@ -20,7 +25,6 @@ module Api
     end
 
     def update
-      @place = current_user.places.find(params[:id])
       if @place.update(place_params)
         render json: @place, status: :ok
       else
@@ -29,19 +33,18 @@ module Api
     end
 
     def destroy
-      @place = current_user.places.find(params[:id])
-
-      if @place.destroy
-        head :no_content
-      else
-        render json: { errors: @place.errors.full_messages }, status: :unprocessable_content
-      end
+      @place.destroy!
+      head :no_content
     end
 
     private
 
+    def set_place
+      @place = current_user.places.find(params[:id])
+    end
+
     def place_params
-      params.require(:place).permit(:title, :address, :lat, :lng, :description, :link_url, :image_url, :location_name, :notes, :visited)
+      params.require(:place).permit(:title, :address, :lat, :lng, :description, :link_url, :image_url, :location_name, :notes, :visited, :google_place_id)
     end
   end
 end
