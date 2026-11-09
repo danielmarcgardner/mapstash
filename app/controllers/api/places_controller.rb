@@ -52,7 +52,7 @@ module Api
 
     # Records for ids the current user owns; any unknown or foreign id is a 422.
     def owned!(scope, ids, attribute)
-      ids = ids.compact_blank.uniq
+      ids = ids.compact_blank.map(&:to_s).uniq
       records = scope.where(id: ids).to_a
       return records if records.size == ids.size
 

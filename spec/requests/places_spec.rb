@@ -208,12 +208,20 @@ RSpec.describe "Places", type: :request do
     end
 
     it "returns 422 for a missing or non-numeric id" do
-      save(:post, "/api/places", new_place.merge(list_ids: [ 0 ]))
-      expect(response).to have_http_status(:unprocessable_content)
+      expect {
+        save(:post, "/api/places", new_place.merge(list_ids: [ 0 ]))
+        expect(response).to have_http_status(:unprocessable_content)
 
-      save(:post, "/api/places", new_place.merge(tag_ids: [ "abc" ]))
-      expect(response).to have_http_status(:unprocessable_content)
-      expect(Place.count).to eq(0)
+        save(:post, "/api/places", new_place.merge(tag_ids: [ "abc" ]))
+        expect(response).to have_http_status(:unprocessable_content)
+      }.not_to change(Place, :count)
+    end
+
+    it "treats the same id sent as a number and a string as one id" do
+      save(:post, "/api/places", new_place.merge(tag_ids: [ coffee.id, coffee.id.to_s ]))
+
+      expect(response).to have_http_status(:created)
+      expect(response.parsed_body["tags"].map { |t| t["id"] }).to eq([ coffee.id ])
     end
 
     context "with an existing place" do
