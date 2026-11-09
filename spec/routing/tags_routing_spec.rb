@@ -2,8 +2,9 @@ require 'rails_helper'
 
 RSpec.describe "Tag routes", type: :routing do
   it "no longer routes the GET add/remove actions that changed data" do
-    expect(get: "/api/tags/add_tag_to_place").not_to route_to("api/tags#add_tag_to_place")
-    expect(get: "/api/tags/remove_tag_from_place").not_to route_to("api/tags#remove_tag_from_place")
+    # The paths now fall through to tags#show, which has no action (404).
+    expect(get: "/api/tags/add_tag_to_place").to route_to("api/tags#show", id: "add_tag_to_place")
+    expect(get: "/api/tags/remove_tag_from_place").to route_to("api/tags#show", id: "remove_tag_from_place")
   end
 
   it "routes adding and removing a place's tag with POST and DELETE only" do
