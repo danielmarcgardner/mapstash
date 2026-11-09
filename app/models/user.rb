@@ -28,6 +28,8 @@ class User < ApplicationRecord
 
   validates :email, presence: true, uniqueness: true
   validates :encrypted_password, presence: true
+  # Not using :validatable, so enforce config.password_length here.
+  validates :password, length: { within: Devise.password_length }, allow_nil: true
 
   has_many :places, dependent: :destroy
   has_many :tags, dependent: :destroy

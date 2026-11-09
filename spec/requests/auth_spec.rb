@@ -53,6 +53,25 @@ RSpec.describe "Auth", type: :request do
   end
 
   describe "POST /api/signup" do
+    it "returns 422 for a password shorter than 6 characters and creates no user" do
+      expect {
+        post "/api/signup", params: { user: { email: "short@example.com", password: "abcde" } }.to_json, headers: AuthHelpers::JSON_HEADERS
+      }.not_to change(User, :count)
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.parsed_body["errors"]).to include(a_string_starting_with("Password is too short"))
+    end
+
+    it "returns a token that works on /api/users/me" do
+      signup(email: "token@example.com")
+      token = response.parsed_body["token"]
+
+      get "/api/users/me", headers: AuthHelpers::JSON_HEADERS.merge("Authorization" => "Bearer #{token}")
+
+      expect(response).to have_http_status(:ok)
+      expect(response.parsed_body["email"]).to eq("token@example.com")
+    end
+
     def signup(email:)
       post "/api/signup",
            params: { user: { email: email, password: "password123", first_name: "Map", last_name: "Stasher" } }.to_json,
@@ -96,6 +115,13 @@ RSpec.describe "Auth", type: :request do
   end
 
   describe "GET /api/users/me without a token" do
+    it "returns 401 errors for a malformed token" do
+      get "/api/users/me", headers: AuthHelpers::JSON_HEADERS.merge("Authorization" => "Bearer not-a-jwt")
+
+      expect(response).to have_http_status(:unauthorized)
+      expect(response.parsed_body["errors"]).to be_present
+    end
+
     it "returns 401 errors from the failure app" do
       get "/api/users/me", headers: AuthHelpers::JSON_HEADERS
 
@@ -106,6 +132,14 @@ RSpec.describe "Auth", type: :request do
   end
 
   describe "DELETE /api/logout" do
+    it "writes the token's jti to jwt_denylists" do
+      headers = auth_headers(create(:user))
+      jti = Warden::JWTAuth::TokenDecoder.new.call(headers["Authorization"].split.last)["jti"]
+
+      expect { delete "/api/logout", headers: headers }.to change(JwtDenylist, :count).by(1)
+      expect(JwtDenylist.last.jti).to eq(jti)
+    end
+
     it "returns 204 and revokes the token" do
       headers = auth_headers(create(:user))
 

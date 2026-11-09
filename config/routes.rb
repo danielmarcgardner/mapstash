@@ -19,11 +19,7 @@ Rails.application.routes.draw do
       end
     end
     get "up" => "rails/health#show", as: :rails_health_check
-    resources :users, only: [ :show, :update ] do
-      collection do
-        get "me", to: "users#me"
-      end
-    end
+    get "users/me", to: "users#me"
   end
 
   root to: redirect("/index.html")
