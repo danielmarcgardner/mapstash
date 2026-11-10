@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Dashboard from './Dashboard';
 import { jsonResponse, stubFetch } from '../test/fetchStub';
 import { renderWithStore } from '../test/renderWithStore';
+import { baseApi } from '../state/api/baseApi';
 
 // jsdom can't run Google Maps, so the library is replaced with inspectable stand-ins.
 const map = vi.hoisted(() => ({ fitBounds: vi.fn(), setCenter: vi.fn(), setZoom: vi.fn(), panTo: vi.fn() }));
@@ -30,13 +31,20 @@ const place = (id: number, extra: object = {}) => ({
 });
 
 const renderDashboard = (places: unknown, placesRoute = () => places) => {
-    stubFetch({
+    const { count } = stubFetch({
         'GET /api/places': placesRoute,
         'GET /api/tags': () => [],
         'GET /api/lists': () => [],
         'GET /api/users/me': () => ({ id: 1, email: 'a@b.co', first_name: 'A', last_name: 'B' }),
     });
-    renderWithStore(<Dashboard />);
+    const store = renderWithStore(<Dashboard />);
+    return { store, count };
+};
+
+// Simulates a tag or list edit, which refetches places.
+const refetchPlaces = async (store: ReturnType<typeof renderWithStore>, count: (m: string, p: string) => number) => {
+    store.dispatch(baseApi.util.invalidateTags(['Place']));
+    await vi.waitFor(() => expect(count('GET', '/api/places')).toBe(2));
 };
 
 const geolocation = { getCurrentPosition: vi.fn() };
@@ -64,6 +72,25 @@ describe('Dashboard map', () => {
         renderDashboard([place(1, { tags: [tag, { ...tag, id: 2, color: '#000000' }] }), place(2)]);
         const pins = await screen.findAllByTestId('pin');
         expect(pins.map(p => p.dataset.background)).toEqual(['#ff8800', '']);
+    });
+
+    it("doesn't re-frame when a refetch changes only non-coordinate data, like a tag color", async () => {
+        let call = 0;
+        const { store, count } = renderDashboard(null, () =>
+            [place(1, { tags: [{ ...tag, color: ++call === 1 ? '#ff8800' : '#0055ff' }] }), place(2)]);
+        await vi.waitFor(() => expect(map.fitBounds).toHaveBeenCalledOnce());
+        await refetchPlaces(store, count);
+        await vi.waitFor(() => expect(screen.getAllByTestId('pin')[0].dataset.background).toBe('#0055ff'));
+        expect(map.fitBounds).toHaveBeenCalledOnce();
+    });
+
+    it('re-frames when the coordinates change', async () => {
+        let call = 0;
+        const { store, count } = renderDashboard(null, () => (++call === 1 ? [place(1), place(2)] : [place(1), place(2), place(3)]));
+        await vi.waitFor(() => expect(map.fitBounds).toHaveBeenCalledOnce());
+        await refetchPlaces(store, count);
+        await vi.waitFor(() => expect(map.fitBounds).toHaveBeenCalledTimes(2));
+        expect((map.fitBounds.mock.calls[1][0] as FakeBounds).points).toHaveLength(3);
     });
 
     it('skips places without coordinates', async () => {

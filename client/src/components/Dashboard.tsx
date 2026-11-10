@@ -1,6 +1,6 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { AppShell, Loader, Paper, Text } from "@mantine/core";
-import { AdvancedMarker, APIProvider, Map, Pin, useMap } from "@vis.gl/react-google-maps";
+import { AdvancedMarker, APIProvider, Map as GoogleMap, Pin, useMap } from "@vis.gl/react-google-maps";
 import AppShellComponent from "./AppShell";
 import SideBar from "./SideBar";
 import { useGetPlacesQuery } from "../state/api/placeApi";
@@ -16,9 +16,14 @@ type MappablePlace = Place & { lat: number; lng: number };
 // Frames the map around the places, or the user's area when there are none.
 const FitToPlaces = ({ places }: { places: MappablePlace[] }) => {
     const map = useMap();
+    const framedFor = useRef<string | null>(null);
 
     useEffect(() => {
         if (!map) return;
+        // Tag and list edits refetch places; only re-frame when the coordinates change, so the user's zoom survives.
+        const coordinates = places.map(({ lat, lng }) => `${lat},${lng}`).join("|");
+        if (framedFor.current === coordinates) return;
+        framedFor.current = coordinates;
         if (places.length === 0) {
             navigator.geolocation?.getCurrentPosition(
                 ({ coords }) => map.panTo({ lat: coords.latitude, lng: coords.longitude }),
@@ -59,16 +64,16 @@ const Dashboard = () => {
             <AppShell.Main className="p-0">
                 <div className="relative w-full h-[calc(100vh-60px)]">
                     <APIProvider apiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}>
-                        <Map mapId={MAP_ID} defaultCenter={DEFAULT_CENTER} defaultZoom={12} gestureHandling="greedy">
+                        <GoogleMap mapId={MAP_ID} defaultCenter={DEFAULT_CENTER} defaultZoom={12} gestureHandling="greedy">
                             {mappable.map(place => {
                                 const color = place.tags[0]?.color;
                                 return (
                                     <AdvancedMarker key={place.id} position={{ lat: place.lat, lng: place.lng }} title={place.title}>
-                                        <Pin {...(color && { background: color, borderColor: color, glyphColor: "#ffffff" })} />
+                                        <Pin background={color} borderColor={color} glyphColor={color && "#ffffff"} />
                                     </AdvancedMarker>
                                 );
                             })}
-                        </Map>
+                        </GoogleMap>
                         {isSuccess && <FitToPlaces places={mappable} />}
                     </APIProvider>
 
