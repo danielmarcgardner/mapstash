@@ -1,17 +1,9 @@
-import {type Place } from './place';
-
 type List = {
-    id: string;
+    id: number;
     title: string;
     description?: string;
-    places: Place[];
-}
-type ListState = {
-    lists: List[];
-    isLoading: boolean;
-    isError: boolean;
-    error: string | null;
-    isSuccess: boolean;
+    places_count: number;
+    place_ids: number[];
 }
 
 type CreateListPayload = {
@@ -19,4 +11,6 @@ type CreateListPayload = {
     description?: string;
 }
 
-export type { List, ListState, CreateListPayload };
+type UpdateListPayload = Partial<CreateListPayload>;
+
+export type { List, CreateListPayload, UpdateListPayload };

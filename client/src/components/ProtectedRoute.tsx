@@ -20,7 +20,7 @@ export default function ProtectedRoute() {
     });
 
     useEffect(() => {
-        if (isSuccess && currentUser) {
+        if (isSuccess && currentUser && token) {
             dispatch(loginSuccess({ user: currentUser, token }));
         } else if (isError) {
             dispatch(logout());

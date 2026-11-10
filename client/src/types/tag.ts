@@ -1,14 +1,9 @@
 type Tag = {
-    id: string;
+    id: number;
     name: string;
     color: string;
+    places_count: number;
 };
-type CreateTagPayload = Omit<Tag, 'id' | 'createdAt' | 'updatedAt'>;
-type UpdateTagPayload = Partial<Omit<Tag, 'id' | 'createdAt' | 'updatedAt'>>;
-type TagState = {
-    isLoading: boolean;
-    isError: boolean;
-    tags: Tag[];
-    error: string | null;
-};
-export type { Tag, CreateTagPayload, UpdateTagPayload, TagState };
+type CreateTagPayload = Pick<Tag, 'name' | 'color'>;
+type UpdateTagPayload = Partial<CreateTagPayload>;
+export type { Tag, CreateTagPayload, UpdateTagPayload };
