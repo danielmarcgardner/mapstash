@@ -25,6 +25,7 @@ services:
     environment:
       - CHOKIDAR_USEPOLLING=true
       - VITE_GOOGLE_MAPS_API_KEY=${VITE_GOOGLE_MAPS_API_KEY}
+      - VITE_GOOGLE_MAPS_MAP_ID=${VITE_GOOGLE_MAPS_MAP_ID}
 
   db:
     image: postgres:15
