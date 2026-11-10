@@ -15,3 +15,18 @@ window.matchMedia = (query: string) => ({
     removeEventListener: () => {},
     dispatchEvent: () => false,
 });
+
+// Node's Request rejects relative URLs that browsers resolve; RTK Query builds one per call.
+const NodeRequest = globalThis.Request;
+globalThis.Request = class extends NodeRequest {
+    constructor(input: RequestInfo | URL, init?: RequestInit) {
+        super(typeof input === 'string' ? new URL(input, window.location.href) : input, init);
+    }
+};
+
+// jsdom has no ResizeObserver, and Mantine's ScrollArea needs it.
+globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+};

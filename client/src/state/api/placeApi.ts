@@ -1,39 +1,36 @@
-import { createApi } from '@reduxjs/toolkit/query/react';
 import { type Place, type CreatePlacePayload, type UpdatePlacePayload } from '../../types/place';
-import { baseQuery } from './commonApi';
+import { baseApi } from './baseApi';
 
-export const placeApi = createApi({
-    reducerPath: 'placeApi',
-    baseQuery,
+// Saving a place changes tag places_count and list place_ids, so those refetch too.
+const placeChanged = ['Place', 'Tag', 'List'] as const;
+
+export const placeApi = baseApi.injectEndpoints({
     endpoints: (builder) => ({
         getPlaces: builder.query<Place[], void>({
-            query: () => '/api/places'
+            query: () => '/api/places',
+            providesTags: (result = []) => [
+                { type: 'Place', id: 'LIST' },
+                ...result.map(({ id }) => ({ type: 'Place' as const, id })),
+            ],
         }),
         createPlace: builder.mutation<Place, CreatePlacePayload>({
-            query: (newPlace) => ({
-                url: '/api/places',
-                method: 'POST',
-                body: newPlace
-            })
+            query: (place) => ({ url: '/api/places', method: 'POST', body: { place } }),
+            invalidatesTags: [...placeChanged],
         }),
-        updatePlace: builder.mutation<Place, UpdatePlacePayload & { id: string }>({
-            query: ({ id, ...patch }) => ({
-                url: `/api/places/${id}`,
-                method: 'PATCH',
-                body: patch
-            })
+        updatePlace: builder.mutation<Place, UpdatePlacePayload & { id: number }>({
+            query: ({ id, ...place }) => ({ url: `/api/places/${id}`, method: 'PATCH', body: { place } }),
+            invalidatesTags: [...placeChanged],
         }),
-        deletePlace: builder.mutation<{ success: boolean }, string>({
-            query: (id) => ({
-                url: `/api/places/${id}`,
-                method: 'DELETE'
-            })
-        })
-    })
+        deletePlace: builder.mutation<void, number>({
+            query: (id) => ({ url: `/api/places/${id}`, method: 'DELETE' }),
+            invalidatesTags: [...placeChanged],
+        }),
+    }),
 });
+
 export const {
     useGetPlacesQuery,
     useCreatePlaceMutation,
     useUpdatePlaceMutation,
-    useDeletePlaceMutation
+    useDeletePlaceMutation,
 } = placeApi;

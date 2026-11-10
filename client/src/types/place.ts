@@ -1,26 +1,36 @@
+type PlaceTag = {
+    id: number;
+    name: string;
+    color: string;
+}
+
 type Place = {
-    id: string;
+    id: number;
     title: string;
-    description: string;
+    description: string | null;
     address: string;
+    lat: number | null;
+    lng: number | null;
+    image_url: string | null;
+    location_name: string | null;
+    link_url: string | null;
+    visited: boolean | null;
+    notes: string | null;
+    google_place_id: string | null;
+    tags: PlaceTag[];
+    list_ids: number[];
+    created_at: string;
+    updated_at: string;
+}
+
+type CreatePlacePayload = Partial<Omit<Place, 'id' | 'title' | 'lat' | 'lng' | 'tags' | 'list_ids' | 'created_at' | 'updated_at'>> & {
+    title: string;
     lat: number;
     lng: number;
-    image_url?: string; 
-    location_name?: string;
-    link_url?: string;
-    visited?: boolean;
-    notes?: string;
-}
+    tag_ids?: number[];
+    list_ids?: number[];
+};
 
-type CreatePlacePayload = Omit<Place, 'id'>;
+type UpdatePlacePayload = Partial<CreatePlacePayload>;
 
-type UpdatePlacePayload = Partial<Omit<Place, 'id'>>;
-
-type PlaceState = {
-    isLoading: boolean;
-    isError: boolean;
-    places: Place[];
-    error: string | null;
-}
-
-export type { Place, CreatePlacePayload, UpdatePlacePayload, PlaceState };
+export type { Place, PlaceTag, CreatePlacePayload, UpdatePlacePayload };

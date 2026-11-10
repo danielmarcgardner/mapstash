@@ -1,29 +1,32 @@
-import { createApi } from '@reduxjs/toolkit/query/react';
 import { type User, type SignupCredentials, type LoginCredentials, type SignupResponse, type LoginResponse } from '../../types/user';
-import { baseQuery } from './commonApi';
+import { baseApi } from './baseApi';
 
-export const authApi = createApi({
-    reducerPath: 'authApi',
-    baseQuery,
+// A new session must not show the previous user's cached places, tags or lists.
+const sessionChanged = ['User', 'Place', 'Tag', 'List'] as const;
+
+export const authApi = baseApi.injectEndpoints({
     endpoints: (builder) => ({
         login: builder.mutation<LoginResponse, LoginCredentials>({
-            query: ({ email, password }: LoginCredentials) => ({
+            query: ({ email, password }) => ({
                 url: '/api/login',
                 method: 'POST',
-                body: { user: { email, password }} // Nest parameters under "user"
-            })
+                body: { user: { email, password } },
+            }),
+            invalidatesTags: [...sessionChanged],
         }),
         signup: builder.mutation<SignupResponse, SignupCredentials>({
-            query: ({ email, password, lastName, firstName }: SignupCredentials) => ({
+            query: ({ email, password, lastName, firstName }) => ({
                 url: '/api/signup',
                 method: 'POST',
-                body: { user: {  email, password, first_name: firstName, last_name: lastName }}  // Nest parameters under "user"
-            })
+                body: { user: { email, password, first_name: firstName, last_name: lastName } },
+            }),
+            invalidatesTags: [...sessionChanged],
         }),
         getCurrentUser: builder.query<User, void>({
-            query: () => '/api/users/me'
-        })
-    })
+            query: () => '/api/users/me',
+            providesTags: ['User'],
+        }),
+    }),
 });
 
 export const { useLoginMutation, useSignupMutation, useGetCurrentUserQuery } = authApi;

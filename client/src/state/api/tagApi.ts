@@ -1,36 +1,31 @@
-import { createApi,  } from '@reduxjs/toolkit/query/react';
-import type { Tag, CreateTagPayload } from '../../types/tag';
-import { baseQuery } from './commonApi';
+import type { Tag, CreateTagPayload, UpdateTagPayload } from '../../types/tag';
+import { baseApi } from './baseApi';
 
-export const tagApi = createApi({
-    reducerPath: 'tagApi',
-    baseQuery,
+export const tagApi = baseApi.injectEndpoints({
     endpoints: (builder) => ({
         getTags: builder.query<Tag[], void>({
             query: () => '/api/tags',
+            providesTags: (result = []) => [
+                { type: 'Tag', id: 'LIST' },
+                ...result.map(({ id }) => ({ type: 'Tag' as const, id })),
+            ],
         }),
         createTag: builder.mutation<Tag, CreateTagPayload>({
-            query: (newTag) => ({
-                url: '/api/tags',
-                method: 'POST',
-                body: newTag,
-            }),
+            query: (tag) => ({ url: '/api/tags', method: 'POST', body: { tag } }),
+            invalidatesTags: [{ type: 'Tag', id: 'LIST' }],
         }),
-        updateTag: builder.mutation<Tag, Partial<Tag> & { id: string }>({
-            query: ({ id, ...patch }) => ({
-                url: `/api/tags/${id}`,
-                method: 'PATCH',
-                body: patch,
-            }),
+        // Places embed tag name/color, so tag edits refetch places too.
+        updateTag: builder.mutation<Tag, UpdateTagPayload & { id: number }>({
+            query: ({ id, ...tag }) => ({ url: `/api/tags/${id}`, method: 'PATCH', body: { tag } }),
+            invalidatesTags: (_result, _error, { id }) => [{ type: 'Tag', id }, 'Place'],
         }),
-        deleteTag: builder.mutation<{ success: boolean }, string>({
-            query: (id) => ({
-                url: `/api/tags/${id}`,
-                method: 'DELETE',
-            }),
+        deleteTag: builder.mutation<void, number>({
+            query: (id) => ({ url: `/api/tags/${id}`, method: 'DELETE' }),
+            invalidatesTags: [{ type: 'Tag', id: 'LIST' }, 'Place'],
         }),
     }),
 });
+
 export const {
     useGetTagsQuery,
     useCreateTagMutation,
