@@ -56,6 +56,14 @@ describe('ProtectedRoute', () => {
         expect(store.getState().auth.token).toBeNull();
     });
 
+    it('keeps the session and shows an error when /api/users/me fails for another reason', async () => {
+        stubFetch({ 'GET /api/users/me': () => jsonResponse(500) });
+        const store = renderProtected();
+        expect(await screen.findByRole('alert')).toHaveTextContent('Something went wrong');
+        expect(screen.queryByText('Login page')).not.toBeInTheDocument();
+        expect(store.getState().auth.token).toBe('abc');
+    });
+
     it('redirects without calling the API when there is no token', async () => {
         const { count } = stubFetch({});
         renderProtected(<div>Dashboard</div>, null);

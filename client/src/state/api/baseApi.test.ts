@@ -151,6 +151,16 @@ describe('401 handling', () => {
         expect(store.getState().auth.token).toBe('abc');
     });
 
+    it.each([
+        ['login', () => authApi.endpoints.login.initiate({ email: 'a@b.co', password: 'nope' }), 'POST /api/login'],
+        ['signup', () => authApi.endpoints.signup.initiate({ email: 'a@b.co', password: 'nope', firstName: 'A', lastName: 'B' }), 'POST /api/signup'],
+    ])('keeps a logged-in session when %s returns 401', async (_name, action, route) => {
+        stubFetch({ [route]: () => jsonResponse(401, { errors: ['Invalid email or password'] }) });
+        const store = loggedInStore();
+        await store.dispatch(action());
+        expect(store.getState().auth.token).toBe('abc');
+    });
+
     it('leaves state alone for a wrong password at login', async () => {
         stubFetch({ 'POST /api/login': () => jsonResponse(401, { errors: ['Invalid email or password'] }) });
         const store = makeStore();

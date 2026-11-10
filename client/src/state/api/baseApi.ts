@@ -10,10 +10,17 @@ export const endSession = (dispatch: Dispatch) => {
     dispatch(baseApi.util.resetApiState());
 };
 
-// A 401 on a request that carried a token means it expired or was revoked; ProtectedRoute then redirects.
+// A 401 from login/signup means bad credentials, not a dead session, even if a token is stored.
+const credentialEndpoints = new Set(['login', 'signup']);
+
+// Any other 401 while holding a token means it expired or was revoked; ProtectedRoute then redirects.
 const baseQueryWithLogout: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> = async (args, api, extraOptions) => {
     const result = await baseQuery(args, api, extraOptions);
-    if (result.error?.status === 401 && (api.getState() as RootState).auth.token) endSession(api.dispatch);
+    if (
+        result.error?.status === 401 &&
+        !credentialEndpoints.has(api.endpoint) &&
+        (api.getState() as RootState).auth.token
+    ) endSession(api.dispatch);
     return result;
 };
 
