@@ -39,15 +39,9 @@ export default function Login() {
         setSubmitError(null);
         try {
             const result = await login(values).unwrap();
-            console.log('Login result:', result);
-            
             dispatch(loginSuccess(result));
-            console.log('NAVIGATE TO HOME');
-            
             navigateToHome();
         } catch (err) {
-            console.log('Login error:', err);
-            
             setSubmitError((err as { data?: AuthError })?.data?.errors?.join(' ') || 'Login failed');
         }
     };

@@ -5,7 +5,7 @@ import { authApi } from './authApi';
 import { placeApi } from './placeApi';
 import { tagApi } from './tagApi';
 import { listApi } from './listApi';
-import { stubFetch } from '../../test/fetchStub';
+import { jsonResponse, stubFetch } from '../../test/fetchStub';
 
 const user = { id: 1, email: 'a@b.co', first_name: 'A', last_name: 'B' };
 const newPlace = { title: 'Cafe', address: '1 Main', lat: 1, lng: 2, tag_ids: [3] };
@@ -123,5 +123,39 @@ describe('prepareHeaders', () => {
         const { calls } = stubFetch({ 'GET /api/tags': () => [] });
         await makeStore().dispatch(tagApi.endpoints.getTags.initiate());
         expect(calls[0].auth).toBeNull();
+    });
+});
+
+describe('401 handling', () => {
+    const loggedInStore = () => {
+        const store = makeStore();
+        store.dispatch(loginSuccess({ user, token: 'abc' }));
+        return store;
+    };
+
+    it('ends the session when an authenticated request gets a 401', async () => {
+        stubFetch({ 'GET /api/places': () => [], 'GET /api/tags': () => jsonResponse(401, { errors: ['Signature has expired'] }) });
+        const store = loggedInStore();
+        await store.dispatch(placeApi.endpoints.getPlaces.initiate());
+        await store.dispatch(tagApi.endpoints.getTags.initiate());
+
+        expect(store.getState().auth.token).toBeNull();
+        expect(localStorage.getItem('token')).toBeNull();
+        expect(store.getState().api.queries).toEqual({});
+    });
+
+    it('keeps the session on other errors', async () => {
+        stubFetch({ 'GET /api/tags': () => jsonResponse(500) });
+        const store = loggedInStore();
+        await store.dispatch(tagApi.endpoints.getTags.initiate());
+        expect(store.getState().auth.token).toBe('abc');
+    });
+
+    it('leaves state alone for a wrong password at login', async () => {
+        stubFetch({ 'POST /api/login': () => jsonResponse(401, { errors: ['Invalid email or password'] }) });
+        const store = makeStore();
+        const result = await store.dispatch(authApi.endpoints.login.initiate({ email: 'a@b.co', password: 'nope' }));
+        expect(result.error).toMatchObject({ status: 401 });
+        expect(store.getState().auth.token).toBeNull();
     });
 });
