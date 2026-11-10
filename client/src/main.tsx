@@ -7,6 +7,7 @@ import { store } from './state/store';
 import './index.css'
 import App from './App.tsx'
 import '@mantine/core/styles.css';
+import '@mantine/notifications/styles.css';
 import { theme } from './theme.ts';
 
 

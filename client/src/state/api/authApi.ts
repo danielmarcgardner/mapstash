@@ -22,6 +22,9 @@ export const authApi = baseApi.injectEndpoints({
             }),
             invalidatesTags: [...sessionChanged],
         }),
+        logout: builder.mutation<void, void>({
+            query: () => ({ url: '/api/logout', method: 'DELETE' }),
+        }),
         getCurrentUser: builder.query<User, void>({
             query: () => '/api/users/me',
             providesTags: ['User'],
@@ -29,4 +32,4 @@ export const authApi = baseApi.injectEndpoints({
     }),
 });
 
-export const { useLoginMutation, useSignupMutation, useGetCurrentUserQuery } = authApi;
+export const { useLoginMutation, useSignupMutation, useLogoutMutation, useGetCurrentUserQuery } = authApi;
