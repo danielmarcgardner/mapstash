@@ -1,7 +1,7 @@
 type List = {
     id: number;
     title: string;
-    description?: string;
+    description: string | null;
     places_count: number;
     place_ids: number[];
 }

@@ -81,6 +81,35 @@ describe('cache invalidation', () => {
     });
 });
 
+describe('session change', () => {
+    it.each([
+        ['login', () => authApi.endpoints.login.initiate({ email: 'a@b.co', password: 'pw' })],
+        ['signup', () => authApi.endpoints.signup.initiate({ email: 'a@b.co', password: 'pw', firstName: 'A', lastName: 'B' })],
+    ])('%s refetches places, tags and lists', async (_name, action) => {
+        const { count } = stubFetch({
+            'GET /api/places': () => [],
+            'GET /api/tags': () => [],
+            'GET /api/lists': () => [],
+            'POST /api/login': () => ({ user, token: 't' }),
+            'POST /api/signup': () => ({ user, token: 't' }),
+        });
+        const store = makeStore();
+        const subs = [
+            store.dispatch(placeApi.endpoints.getPlaces.initiate()),
+            store.dispatch(tagApi.endpoints.getTags.initiate()),
+            store.dispatch(listApi.endpoints.getLists.initiate()),
+        ];
+        await Promise.all(subs);
+        await store.dispatch(action());
+        await vi.waitFor(() => {
+            expect(count('GET', '/api/places')).toBe(2);
+            expect(count('GET', '/api/tags')).toBe(2);
+            expect(count('GET', '/api/lists')).toBe(2);
+        });
+        subs.forEach(sub => sub.unsubscribe());
+    });
+});
+
 describe('prepareHeaders', () => {
     it('sends the bearer token when logged in', async () => {
         const { calls } = stubFetch({ 'GET /api/tags': () => [] });

@@ -32,11 +32,11 @@ const Dashboard = () => {
                         >
                             {isLoading && <div>Loading...</div>}
                             {isError && <div>Error loading places</div>}
-                            {isSuccess && places && places.map(place => (
+                            {isSuccess && places && places.map(({ id, lat, lng, title }) => lat !== null && lng !== null && (
                                 <Marker
-                                    key={place.id}
-                                    position={{ lat: place.lat, lng: place.lng }}
-                                    title={place.title}
+                                    key={id}
+                                    position={{ lat, lng }}
+                                    title={title}
                                 />
                             ))}
                         </GoogleMap>

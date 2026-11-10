@@ -1,6 +1,9 @@
 import { type User, type SignupCredentials, type LoginCredentials, type SignupResponse, type LoginResponse } from '../../types/user';
 import { baseApi } from './baseApi';
 
+// A new session must not show the previous user's cached places, tags or lists.
+const sessionChanged = ['User', 'Place', 'Tag', 'List'] as const;
+
 export const authApi = baseApi.injectEndpoints({
     endpoints: (builder) => ({
         login: builder.mutation<LoginResponse, LoginCredentials>({
@@ -9,7 +12,7 @@ export const authApi = baseApi.injectEndpoints({
                 method: 'POST',
                 body: { user: { email, password } },
             }),
-            invalidatesTags: ['User'],
+            invalidatesTags: [...sessionChanged],
         }),
         signup: builder.mutation<SignupResponse, SignupCredentials>({
             query: ({ email, password, lastName, firstName }) => ({
@@ -17,7 +20,7 @@ export const authApi = baseApi.injectEndpoints({
                 method: 'POST',
                 body: { user: { email, password, first_name: firstName, last_name: lastName } },
             }),
-            invalidatesTags: ['User'],
+            invalidatesTags: [...sessionChanged],
         }),
         getCurrentUser: builder.query<User, void>({
             query: () => '/api/users/me',
