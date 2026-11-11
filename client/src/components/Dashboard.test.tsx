@@ -450,6 +450,41 @@ describe('Place form tags', () => {
         expect(drawer.getByText('Bar')).toBeInTheDocument();
     });
 
+    it("knows the place's own tags even when the tags list fails to load", async () => {
+        const { calls, count } = renderDashboard(null, () => [place(1, { tags: [{ id: 1, name: 'Coffee', color: '#ff8800' }] })], {
+            'GET /api/tags': () => jsonResponse(500),
+            'POST /api/tags': () => ({ id: 3, name: 'Brunch', color: '#c1d5f5', places_count: 0 }),
+            'PATCH /api/places/1': () => place(1),
+        });
+        fireEvent.click((await screen.findAllByTestId('marker'))[0]);
+        fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+        await screen.findByPlaceholderText('Add tags');
+        addTag('Brunch');
+        save();
+
+        await vi.waitFor(() => expect(calls.find(c => c.method === 'PATCH')?.body).toEqual({ place: { tag_ids: [1, 3] } }));
+        expect(count('POST', '/api/tags')).toBe(1);
+        expect(calls.find(c => c.method === 'POST')?.body).toEqual({ tag: { name: 'Brunch' } });
+    });
+
+    it('reuses a tag it already created when retrying a failed save', async () => {
+        let attempts = 0;
+        const { calls, count } = renderDashboard([], undefined, {
+            'GET /api/tags': () => tags,
+            'POST /api/tags': () => ({ id: 3, name: 'Brunch', color: '#c1d5f5', places_count: 0 }),
+            'POST /api/places': () => (++attempts === 1 ? jsonResponse(500) : place(9)),
+        });
+        await openAddForm();
+        addTag('Brunch');
+        save();
+        expect(await within(screen.getByRole('dialog', { name: 'Add place' })).findByRole('alert')).toHaveTextContent("Couldn't save the place.");
+        save();
+
+        await vi.waitFor(() => expect(count('POST', '/api/places')).toBe(2));
+        expect(count('POST', '/api/tags')).toBe(1);
+        expect(calls.filter(c => c.path === '/api/places' && c.method === 'POST')[1].body).toEqual({ place: expect.objectContaining({ tag_ids: [3] }) });
+    });
+
     it("shows a failed tag create and doesn't save the place", async () => {
         const { count } = renderDashboard([], undefined, {
             'GET /api/tags': () => tags,

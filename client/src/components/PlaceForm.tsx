@@ -34,6 +34,8 @@ const PlaceForm = ({ place, onClose, onSaved }: Props) => {
     const [pickedLabel, setPickedLabel] = useState<string | null>(null);
     const sessionToken = useRef<google.maps.places.AutocompleteSessionToken | null>(null);
     const latestPick = useRef(0);
+    // Tags this form already created, so a retry after a failed save reuses them instead of re-creating them.
+    const createdTags = useRef(new Map<string, number>());
 
     const form = useForm({
         initialValues: {
@@ -97,12 +99,19 @@ const PlaceForm = ({ place, onClose, onSaved }: Props) => {
     };
 
     // Typed names that match no tag (case-insensitive, like the server's uniqueness rule) are created on save,
-    // so cancelling the form leaves no orphan tags. New tags get the server's default color.
+    // so cancelling before saving leaves no orphan tags. New tags get the server's default color.
     const resolveTagIds = async (names: string[]) => {
+        // The place's own tags count as known even if the tags list hasn't loaded.
+        const known = [...tags, ...(place?.tags ?? [])];
         const ids: number[] = [];
         for (const name of names) {
-            const existing = tags.find(t => t.name.toLowerCase() === name.trim().toLowerCase());
-            ids.push(existing ? existing.id : (await createTag({ name: name.trim() }).unwrap()).id);
+            const key = name.trim().toLowerCase();
+            let id = known.find(t => t.name.toLowerCase() === key)?.id ?? createdTags.current.get(key);
+            if (id === undefined) {
+                id = (await createTag({ name: name.trim() }).unwrap()).id;
+                createdTags.current.set(key, id);
+            }
+            ids.push(id);
         }
         return [...new Set(ids)];
     };
