@@ -2,7 +2,7 @@ import { fireEvent, screen, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Dashboard from './Dashboard';
-import { jsonResponse, stubFetch } from '../test/fetchStub';
+import { jsonResponse, stubFetch, type Route } from '../test/fetchStub';
 import { renderWithStore } from '../test/renderWithStore';
 import { baseApi } from '../state/api/baseApi';
 
@@ -46,7 +46,7 @@ const lists = [
     { id: 8, title: 'Brunch', description: null, places_count: 0, place_ids: [] },
 ];
 
-const renderDashboard = (places: unknown, placesRoute = () => places, extraRoutes: Parameters<typeof stubFetch>[0] = {}) => {
+const renderDashboard = (places: unknown, placesRoute: Route = () => places, extraRoutes: Parameters<typeof stubFetch>[0] = {}) => {
     const { calls, count } = stubFetch({
         'GET /api/places': placesRoute,
         'GET /api/tags': () => [],
@@ -514,7 +514,7 @@ describe('Tag filter and management', () => {
     const tagButton = (name: string) => screen.findByRole('button', { name: new RegExp(`^${name}\\b`) });
 
     it('filters the map by the selected tags and clears the filter', async () => {
-        const { calls } = renderDashboard(null, placesFor as () => unknown, {
+        const { calls } = renderDashboard(null, placesFor, {
             'GET /api/tags': () => [tagRow(coffee, 1), tagRow(bar, 1)],
         });
         expect(await screen.findAllByTestId('marker')).toHaveLength(3);
@@ -534,9 +534,28 @@ describe('Tag filter and management', () => {
         expect(screen.queryByRole('button', { name: 'Clear filter' })).not.toBeInTheDocument();
     });
 
+    it("doesn't flash an empty state while a new filter loads", async () => {
+        const lonely = { id: 5, name: 'Lonely', color: '#123456' };
+        let release: (() => void) | null = null;
+        renderDashboard(null, (body, url) => {
+            const ids = url.searchParams.getAll('tag_ids[]').map(Number);
+            if (ids.includes(1)) return new Promise(resolve => { release = () => resolve(placesFor(body, url)); });
+            return placesFor(body, url);
+        }, { 'GET /api/tags': () => [tagRow(lonely, 0), tagRow(coffee, 1)] });
+        fireEvent.click(await tagButton('Lonely'));
+        expect(await screen.findByText('No places with these tags')).toBeInTheDocument();
+
+        // The Lonely + Coffee request is held open; the old empty result must not be presented as this filter's answer.
+        fireEvent.click(await tagButton('Coffee'));
+        await vi.waitFor(() => expect(screen.queryByText('No places with these tags')).not.toBeInTheDocument());
+        await vi.waitFor(() => expect(release).not.toBeNull()); // the request reached the stub and is held
+        release!();
+        await vi.waitFor(() => expect(screen.getAllByTestId('marker')).toHaveLength(1));
+    });
+
     it('says when no places have the selected tags', async () => {
         const lonely = { id: 5, name: 'Lonely', color: '#123456' };
-        renderDashboard(null, placesFor as () => unknown, { 'GET /api/tags': () => [tagRow(lonely, 0)] });
+        renderDashboard(null, placesFor, { 'GET /api/tags': () => [tagRow(lonely, 0)] });
         fireEvent.click(await tagButton('Lonely'));
         expect(await screen.findByText('No places with these tags')).toBeInTheDocument();
         expect(screen.queryByText('No places yet')).not.toBeInTheDocument();
@@ -581,7 +600,7 @@ describe('Tag filter and management', () => {
 
     it('deletes a tag after confirming and drops it from the filter', async () => {
         let deleted = false;
-        const { calls, count } = renderDashboard(null, placesFor as () => unknown, {
+        const { calls, count } = renderDashboard(null, placesFor, {
             'GET /api/tags': () => (deleted ? [tagRow(bar, 1)] : [tagRow(coffee, 1), tagRow(bar, 1)]),
             'DELETE /api/tags/1': () => { deleted = true; return new Response(null, { status: 204 }); },
         });

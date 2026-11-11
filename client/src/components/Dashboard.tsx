@@ -66,7 +66,7 @@ const MapOverlay = ({ children, alert = false }: { children: React.ReactNode; al
 
 const Dashboard = () => {
     const [tagFilter, setTagFilter] = useState<number[]>([]);
-    const { data: places, isLoading, isError, isSuccess } = useGetPlacesQuery(tagFilter.length ? { tag_ids: tagFilter } : undefined);
+    const { data: places, isLoading, isFetching, isError, isSuccess } = useGetPlacesQuery(tagFilter.length ? { tag_ids: tagFilter } : undefined);
     const mappable = useMemo(
         () => (places ?? []).filter((p): p is MappablePlace => p.lat !== null && p.lng !== null),
         [places],
@@ -119,7 +119,8 @@ const Dashboard = () => {
                             <Text size="sm" c="red">Something went wrong. Please try again later.</Text>
                         </MapOverlay>
                     )}
-                    {isSuccess && mappable.length === 0 && (
+                    {/* While a new filter loads, data is still the previous result, so wait before calling it empty. */}
+                    {isSuccess && !isFetching && mappable.length === 0 && (
                         <MapOverlay>
                             {tagFilter.length ? (
                                 <Text fw={600}>No places with these tags</Text>
