@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { Alert, Button, Group, Modal, Select, Stack, TextInput, Textarea } from "@mantine/core";
+import { Alert, Button, Group, Modal, Select, Stack, TagsInput, TextInput, Textarea } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { useDebouncedValue } from "@mantine/hooks";
 import { notifications } from "@mantine/notifications";
 import { useMapsLibrary } from "@vis.gl/react-google-maps";
 import { useCreatePlaceMutation, useUpdatePlaceMutation } from "../state/api/placeApi";
+import { useCreateTagMutation, useGetTagsQuery } from "../state/api/tagApi";
 import type { CreatePlacePayload, Place } from "../types/place";
 import type { AuthError } from "../types/user";
 
@@ -23,6 +24,8 @@ const PlaceForm = ({ place, onClose, onSaved }: Props) => {
     const placesLib = useMapsLibrary("places");
     const [createPlace, createStatus] = useCreatePlaceMutation();
     const [updatePlace, updateStatus] = useUpdatePlaceMutation();
+    const { data: tags = [] } = useGetTagsQuery();
+    const [createTag, createTagStatus] = useCreateTagMutation();
     const [submitError, setSubmitError] = useState<string | null>(null);
 
     const [search, setSearch] = useState("");
@@ -43,6 +46,7 @@ const PlaceForm = ({ place, onClose, onSaved }: Props) => {
             lat: place?.lat ?? null as number | null,
             lng: place?.lng ?? null as number | null,
             google_place_id: place?.google_place_id ?? "",
+            tags: place?.tags.map(t => t.name) ?? [],
         },
         validate: {
             title: (value) => (value.trim() ? null : "Title is required"),
@@ -92,14 +96,27 @@ const PlaceForm = ({ place, onClose, onSaved }: Props) => {
         form.clearFieldError("lat");
     };
 
+    // Typed names that match no tag (case-insensitive, like the server's uniqueness rule) are created on save,
+    // so cancelling the form leaves no orphan tags. New tags get the server's default color.
+    const resolveTagIds = async (names: string[]) => {
+        const ids: number[] = [];
+        for (const name of names) {
+            const existing = tags.find(t => t.name.toLowerCase() === name.trim().toLowerCase());
+            ids.push(existing ? existing.id : (await createTag({ name: name.trim() }).unwrap()).id);
+        }
+        return [...new Set(ids)];
+    };
+
     const handleSubmit = async (values: typeof form.values) => {
         setSubmitError(null);
         // Edits send only changed fields, so display-only values (like a missing address's placeholder) aren't saved back.
-        const fields = Object.entries(values).filter(([key]) => !place || form.isDirty(key));
+        const { tags: tagNames, ...fieldValues } = values;
+        const fields = Object.entries(fieldValues).filter(([key]) => !place || form.isDirty(key));
         // Blank optional fields are stored as null, not "". Built per key, so TS can't see the shape:
         // title and lat/lng are guaranteed by validation, and the API accepts null for the rest.
         const payload = Object.fromEntries(fields.map(([key, value]) => [key, value === "" ? null : value])) as unknown as CreatePlacePayload;
         try {
+            if (!place || form.isDirty("tags")) payload.tag_ids = await resolveTagIds(tagNames);
             const saved = place
                 ? await updatePlace({ id: place.id, ...payload }).unwrap()
                 : await createPlace(payload).unwrap();
@@ -129,6 +146,13 @@ const PlaceForm = ({ place, onClose, onSaved }: Props) => {
                         error={form.errors.lat}
                     />
                     <TextInput label="Title" {...form.getInputProps("title")} />
+                    <TagsInput
+                        label="Tags"
+                        placeholder="Add tags"
+                        data={tags.map(t => t.name)}
+                        clearable
+                        {...form.getInputProps("tags")}
+                    />
                     <TextInput label="Link" placeholder="https://www.instagram.com/reel/…" {...form.getInputProps("link_url")} />
                     <Textarea label="Description" autosize minRows={2} {...form.getInputProps("description")} />
                     <Textarea label="Notes" autosize minRows={2} {...form.getInputProps("notes")} />
@@ -136,7 +160,7 @@ const PlaceForm = ({ place, onClose, onSaved }: Props) => {
                     {submitError && <Alert color="red" role="alert">{submitError}</Alert>}
                     <Group justify="flex-end">
                         <Button variant="default" onClick={onClose}>Cancel</Button>
-                        <Button type="submit" loading={createStatus.isLoading || updateStatus.isLoading}>Save</Button>
+                        <Button type="submit" loading={createStatus.isLoading || updateStatus.isLoading || createTagStatus.isLoading}>Save</Button>
                     </Group>
                 </Stack>
             </form>

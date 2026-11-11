@@ -374,3 +374,92 @@ describe('Place form location picks', () => {
         expect(screen.getByLabelText('Title')).toHaveValue('Fast');
     });
 });
+
+describe('Place form tags', () => {
+    const tags = [
+        { id: 1, name: 'Coffee', color: '#ff8800', places_count: 0 },
+        { id: 2, name: 'Bar', color: '#000000', places_count: 0 },
+    ];
+    const addTag = (name: string) => {
+        const input = screen.getByPlaceholderText('Add tags');
+        fireEvent.change(input, { target: { value: name } });
+        fireEvent.keyDown(input, { key: 'Enter' });
+    };
+    const openAddForm = async () => {
+        fireEvent.click(await screen.findByRole('button', { name: 'Add place' }));
+        await searchFor("Sammy's", "Sammy's Sandwich Shop, Atlanta, GA");
+        await vi.waitFor(() => expect(screen.getByLabelText('Title')).toHaveValue("Sammy's Sandwich Shop"));
+    };
+    // The location search helper from 'Place form', repeated here because it's scoped to that describe.
+    const searchFor = async (text: string, option: string) => {
+        const input = screen.getByPlaceholderText('Search for a place');
+        await vi.waitFor(() => expect(input).toHaveFocus());
+        fireEvent.change(input, { target: { value: text } });
+        fireEvent.click(await screen.findByRole('option', { name: option, hidden: true }));
+    };
+    const save = () => fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    it('creates a new tag and applies it with an existing one in one save', async () => {
+        const { calls } = renderDashboard([], undefined, {
+            'GET /api/tags': () => tags,
+            'POST /api/tags': () => ({ id: 3, name: 'Brunch', color: '#c1d5f5', places_count: 0 }),
+            'POST /api/places': () => place(9),
+        });
+        await openAddForm();
+        addTag('Coffee');
+        addTag('Brunch');
+        save();
+
+        await vi.waitFor(() => expect(calls.some(c => c.method === 'POST' && c.path === '/api/places')).toBe(true));
+        const tagPost = calls.findIndex(c => c.method === 'POST' && c.path === '/api/tags');
+        const placePost = calls.findIndex(c => c.method === 'POST' && c.path === '/api/places');
+        expect(calls[tagPost].body).toEqual({ tag: { name: 'Brunch' } });
+        expect(tagPost).toBeLessThan(placePost);
+        expect(calls[placePost].body).toEqual({ place: expect.objectContaining({ tag_ids: [1, 3] }) });
+    });
+
+    it('reuses an existing tag typed in a different case', async () => {
+        const { calls, count } = renderDashboard([], undefined, {
+            'GET /api/tags': () => tags,
+            'POST /api/places': () => place(9),
+        });
+        await openAddForm();
+        addTag('coffee');
+        save();
+
+        await vi.waitFor(() => expect(count('POST', '/api/places')).toBe(1));
+        expect(count('POST', '/api/tags')).toBe(0);
+        expect(calls.find(c => c.method === 'POST')?.body).toEqual({ place: expect.objectContaining({ tag_ids: [1] }) });
+    });
+
+    it("removes a tag from a place and updates its chips", async () => {
+        let placeTags = [tags[1], tags[0]].map(({ id, name, color }) => ({ id, name, color }));
+        const { calls } = renderDashboard(null, () => [place(1, { tags: placeTags })], {
+            'GET /api/tags': () => tags,
+            'PATCH /api/places/1': () => { placeTags = placeTags.filter(t => t.id === 2); return place(1, { tags: placeTags }); },
+        });
+        fireEvent.click((await screen.findAllByTestId('marker'))[0]);
+        fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+        const input = await screen.findByPlaceholderText('Add tags');
+        fireEvent.keyDown(input, { key: 'Backspace' }); // removes the last tag, Coffee
+        save();
+
+        await vi.waitFor(() => expect(calls.find(c => c.method === 'PATCH')?.body).toEqual({ place: { tag_ids: [2] } }));
+        const drawer = within(await screen.findByRole('dialog', { name: 'Place 1' }));
+        await vi.waitFor(() => expect(drawer.queryByText('Coffee')).not.toBeInTheDocument());
+        expect(drawer.getByText('Bar')).toBeInTheDocument();
+    });
+
+    it("shows a failed tag create and doesn't save the place", async () => {
+        const { count } = renderDashboard([], undefined, {
+            'GET /api/tags': () => tags,
+            'POST /api/tags': () => jsonResponse(422, { errors: ['Name is too long'] }),
+        });
+        await openAddForm();
+        addTag('Brunch');
+        save();
+
+        expect(await within(screen.getByRole('dialog', { name: 'Add place' })).findByRole('alert')).toHaveTextContent('Name is too long');
+        expect(count('POST', '/api/places')).toBe(0);
+    });
+});
