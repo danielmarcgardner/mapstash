@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Dashboard from './Dashboard';
@@ -11,8 +11,8 @@ const map = vi.hoisted(() => ({ fitBounds: vi.fn(), setCenter: vi.fn(), setZoom:
 vi.mock('@vis.gl/react-google-maps', () => ({
     APIProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
     Map: ({ children }: { children: ReactNode }) => <div data-testid="map">{children}</div>,
-    AdvancedMarker: ({ title, children }: { title: string; children: ReactNode }) => (
-        <div data-testid="marker" title={title}>{children}</div>
+    AdvancedMarker: ({ title, children, onClick }: { title: string; children: ReactNode; onClick?: () => void }) => (
+        <button data-testid="marker" title={title} onClick={onClick}>{children}</button>
     ),
     Pin: ({ background }: { background?: string }) => <span data-testid="pin" data-background={background ?? ''} />,
     useMap: () => map,
@@ -30,15 +30,21 @@ const place = (id: number, extra: object = {}) => ({
     google_place_id: null, created_at: '', updated_at: '', ...extra,
 });
 
-const renderDashboard = (places: unknown, placesRoute = () => places) => {
-    const { count } = stubFetch({
+const lists = [
+    { id: 7, title: 'Date night', description: null, places_count: 1, place_ids: [1] },
+    { id: 8, title: 'Brunch', description: null, places_count: 0, place_ids: [] },
+];
+
+const renderDashboard = (places: unknown, placesRoute = () => places, extraRoutes: Parameters<typeof stubFetch>[0] = {}) => {
+    const { calls, count } = stubFetch({
         'GET /api/places': placesRoute,
         'GET /api/tags': () => [],
-        'GET /api/lists': () => [],
+        'GET /api/lists': () => lists,
         'GET /api/users/me': () => ({ id: 1, email: 'a@b.co', first_name: 'A', last_name: 'B' }),
+        ...extraRoutes,
     });
     const store = renderWithStore(<Dashboard />);
-    return { store, count };
+    return { store, calls, count };
 };
 
 // Simulates a tag or list edit, which refetches places.
@@ -135,5 +141,85 @@ describe('Dashboard map', () => {
         renderDashboard(null, () => jsonResponse(500));
         expect(await screen.findByText('Something went wrong. Please try again later.', { selector: 'p' })).toBeInTheDocument();
         expect(screen.queryByText('No places yet')).not.toBeInTheDocument();
+    });
+});
+
+describe('Place details', () => {
+    const detailed = place(1, {
+        address: '123 Peachtree St', description: 'Great sandwiches', notes: 'Get the Cuban',
+        link_url: 'https://www.instagram.com/reel/abc', tags: [tag], list_ids: [7],
+    });
+
+    const openMarker = async (title: string) => {
+        const markers = await screen.findAllByTestId('marker');
+        fireEvent.click(markers.find(m => m.title === title)!);
+        return screen.findByRole('dialog');
+    };
+
+    it("opens a marker's details and pans the map to it", async () => {
+        renderDashboard([detailed, place(2)]);
+        const drawer = within(await openMarker('Place 1'));
+        expect(drawer.getByText('Place 1')).toBeInTheDocument();
+        expect(drawer.getByText('123 Peachtree St')).toBeInTheDocument();
+        expect(drawer.getByText('Great sandwiches')).toBeInTheDocument();
+        expect(drawer.getByText('Get the Cuban')).toBeInTheDocument();
+        expect(drawer.getByText('Coffee')).toBeInTheDocument();
+        expect(await drawer.findByText('Date night')).toBeInTheDocument();
+        expect(drawer.queryByText('Brunch')).not.toBeInTheDocument();
+        expect(map.panTo).toHaveBeenCalledWith({ lat: 31, lng: -81 });
+    });
+
+    it('keeps the place on screen while the drawer closes', async () => {
+        renderDashboard([detailed]);
+        fireEvent.keyDown(await openMarker('Place 1'), { key: 'Escape' });
+        expect(screen.getByText('123 Peachtree St')).toBeInTheDocument(); // still animating out, not blank
+        await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    });
+
+    it('opens the saved link in a new tab', async () => {
+        renderDashboard([detailed]);
+        const link = within(await openMarker('Place 1')).getByRole('link', { name: 'Open link' });
+        expect(link).toHaveAttribute('href', 'https://www.instagram.com/reel/abc');
+        expect(link).toHaveAttribute('target', '_blank');
+        expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    });
+
+    it('hides Open link when the place has no link', async () => {
+        renderDashboard([place(1)]);
+        expect(within(await openMarker('Place 1')).queryByRole('link', { name: 'Open link' })).not.toBeInTheDocument();
+    });
+
+    it('deletes after confirming, removing the marker and closing the details', async () => {
+        let deleted = false;
+        const { count } = renderDashboard(null, () => (deleted ? [place(2)] : [detailed, place(2)]), {
+            'DELETE /api/places/1': () => { deleted = true; return new Response(null, { status: 204 }); },
+        });
+        const drawer = within(await openMarker('Place 1'));
+        fireEvent.click(drawer.getByRole('button', { name: 'Delete' }));
+        expect(count('DELETE', '/api/places/1')).toBe(0);
+        fireEvent.click(drawer.getByRole('button', { name: 'Delete this place?' }));
+        await vi.waitFor(() => expect(screen.getAllByTestId('marker')).toHaveLength(1));
+        expect(count('DELETE', '/api/places/1')).toBe(1);
+        expect(count('GET', '/api/places')).toBe(2); // refetched, not reloaded
+        await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    });
+
+    it("doesn't delete when the confirm is cancelled", async () => {
+        const { count } = renderDashboard([detailed]);
+        const drawer = within(await openMarker('Place 1'));
+        fireEvent.click(drawer.getByRole('button', { name: 'Delete' }));
+        fireEvent.click(drawer.getByRole('button', { name: 'Cancel' }));
+        expect(drawer.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
+        expect(count('DELETE', '/api/places/1')).toBe(0);
+    });
+
+    it('shows an error and keeps the place when the delete fails', async () => {
+        renderDashboard([detailed], undefined, { 'DELETE /api/places/1': () => jsonResponse(500) });
+        const drawer = within(await openMarker('Place 1'));
+        fireEvent.click(drawer.getByRole('button', { name: 'Delete' }));
+        fireEvent.click(drawer.getByRole('button', { name: 'Delete this place?' }));
+        expect(await drawer.findByRole('alert')).toHaveTextContent("Couldn't delete this place");
+        expect(screen.getByRole('dialog')).toBeInTheDocument();
+        expect(screen.getAllByTestId('marker')).toHaveLength(1);
     });
 });
