@@ -2,7 +2,7 @@ import { fireEvent, screen, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Dashboard from './Dashboard';
-import { jsonResponse, stubFetch } from '../test/fetchStub';
+import { jsonResponse, stubFetch, type Route } from '../test/fetchStub';
 import { renderWithStore } from '../test/renderWithStore';
 import { baseApi } from '../state/api/baseApi';
 
@@ -46,7 +46,7 @@ const lists = [
     { id: 8, title: 'Brunch', description: null, places_count: 0, place_ids: [] },
 ];
 
-const renderDashboard = (places: unknown, placesRoute = () => places, extraRoutes: Parameters<typeof stubFetch>[0] = {}) => {
+const renderDashboard = (places: unknown, placesRoute: Route = () => places, extraRoutes: Parameters<typeof stubFetch>[0] = {}) => {
     const { calls, count } = stubFetch({
         'GET /api/places': placesRoute,
         'GET /api/tags': () => [],
@@ -496,5 +496,129 @@ describe('Place form tags', () => {
 
         expect(await within(screen.getByRole('dialog', { name: 'Add place' })).findByRole('alert')).toHaveTextContent('Name is too long');
         expect(count('POST', '/api/places')).toBe(0);
+    });
+});
+
+describe('Tag filter and management', () => {
+    const coffee = { id: 1, name: 'Coffee', color: '#ff8800' };
+    const bar = { id: 2, name: 'Bar', color: '#000000' };
+    const allPlaces = [place(1, { tags: [coffee] }), place(2, { tags: [bar] }), place(3)];
+    // Answers like the API: any of the requested tag_ids, or everything without a filter.
+    const placesFor = (_body: unknown, url: URL) => {
+        const ids = url.searchParams.getAll('tag_ids[]').map(Number);
+        return ids.length ? allPlaces.filter(p => (p.tags as { id: number }[]).some(t => ids.includes(t.id))) : allPlaces;
+    };
+    const tagRow = (tag: { id: number; name: string; color: string }, count: number) => ({ ...tag, places_count: count });
+    const placeQueries = (calls: { method: string; path: string; query: string }[]) =>
+        calls.filter(c => c.method === 'GET' && c.path === '/api/places').map(c => c.query);
+    const tagButton = (name: string) => screen.findByRole('button', { name: new RegExp(`^${name}\\b`) });
+
+    it('filters the map by the selected tags and clears the filter', async () => {
+        const { calls } = renderDashboard(null, placesFor, {
+            'GET /api/tags': () => [tagRow(coffee, 1), tagRow(bar, 1)],
+        });
+        expect(await screen.findAllByTestId('marker')).toHaveLength(3);
+        expect(await tagButton('Coffee')).toHaveTextContent('1');
+
+        fireEvent.click(await tagButton('Coffee'));
+        await vi.waitFor(() => expect(screen.getAllByTestId('marker')).toHaveLength(1));
+        expect(screen.getByTestId('marker')).toHaveAttribute('title', 'Place 1');
+        expect(await tagButton('Coffee')).toHaveAttribute('aria-pressed', 'true');
+
+        fireEvent.click(await tagButton('Bar'));
+        await vi.waitFor(() => expect(screen.getAllByTestId('marker')).toHaveLength(2));
+        expect(placeQueries(calls)).toEqual(['', '?tag_ids[]=1', '?tag_ids[]=1&tag_ids[]=2']);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Clear filter' }));
+        await vi.waitFor(() => expect(screen.getAllByTestId('marker')).toHaveLength(3));
+        expect(screen.queryByRole('button', { name: 'Clear filter' })).not.toBeInTheDocument();
+    });
+
+    it("doesn't flash an empty state while a new filter loads", async () => {
+        const lonely = { id: 5, name: 'Lonely', color: '#123456' };
+        let release: (() => void) | null = null;
+        renderDashboard(null, (body, url) => {
+            const ids = url.searchParams.getAll('tag_ids[]').map(Number);
+            if (ids.includes(1)) return new Promise(resolve => { release = () => resolve(placesFor(body, url)); });
+            return placesFor(body, url);
+        }, { 'GET /api/tags': () => [tagRow(lonely, 0), tagRow(coffee, 1)] });
+        fireEvent.click(await tagButton('Lonely'));
+        expect(await screen.findByText('No places with these tags')).toBeInTheDocument();
+
+        // The Lonely + Coffee request is held open; the old empty result must not be presented as this filter's answer.
+        fireEvent.click(await tagButton('Coffee'));
+        await vi.waitFor(() => expect(screen.queryByText('No places with these tags')).not.toBeInTheDocument());
+        await vi.waitFor(() => expect(release).not.toBeNull()); // the request reached the stub and is held
+        release!();
+        await vi.waitFor(() => expect(screen.getAllByTestId('marker')).toHaveLength(1));
+    });
+
+    it('says when no places have the selected tags', async () => {
+        const lonely = { id: 5, name: 'Lonely', color: '#123456' };
+        renderDashboard(null, placesFor, { 'GET /api/tags': () => [tagRow(lonely, 0)] });
+        fireEvent.click(await tagButton('Lonely'));
+        expect(await screen.findByText('No places with these tags')).toBeInTheDocument();
+        expect(screen.queryByText('No places yet')).not.toBeInTheDocument();
+    });
+
+    it('renames and recolors a tag, updating chips and pins without a reload', async () => {
+        let current = coffee;
+        const { calls } = renderDashboard(null, () => [place(1, { tags: [current] })], {
+            'GET /api/tags': () => [tagRow(current, 1)],
+            'PATCH /api/tags/1': (body) => {
+                current = { ...current, ...(body as { tag: object }).tag };
+                return tagRow(current, 1);
+            },
+        });
+        fireEvent.click((await screen.findAllByTestId('marker'))[0]);
+        await screen.findByRole('dialog', { name: 'Place 1' });
+
+        fireEvent.click(await screen.findByRole('button', { name: 'Edit Coffee' }));
+        const editor = within(await screen.findByRole('dialog', { name: 'Edit tag' }));
+        fireEvent.change(editor.getByLabelText('Name'), { target: { value: 'Espresso' } });
+        fireEvent.change(editor.getByLabelText('Color'), { target: { value: '#0055ff' } });
+        fireEvent.click(editor.getByRole('button', { name: 'Save' }));
+
+        await vi.waitFor(() => expect(calls.find(c => c.method === 'PATCH')?.body).toEqual({ tag: { name: 'Espresso', color: '#0055ff' } }));
+        expect(await tagButton('Espresso')).toBeInTheDocument();
+        await vi.waitFor(() => expect(screen.getByTestId('pin').dataset.background).toBe('#0055ff'));
+        expect(within(screen.getByRole('dialog', { name: 'Place 1' })).getByText('Espresso')).toBeInTheDocument();
+        await vi.waitFor(() => expect(screen.queryByRole('dialog', { name: 'Edit tag' })).not.toBeInTheDocument());
+    });
+
+    it('shows the API error when a rename fails', async () => {
+        renderDashboard([], undefined, {
+            'GET /api/tags': () => [tagRow(coffee, 0)],
+            'PATCH /api/tags/1': () => jsonResponse(422, { errors: ['Name has already been taken'] }),
+        });
+        fireEvent.click(await screen.findByRole('button', { name: 'Edit Coffee' }));
+        const editor = within(await screen.findByRole('dialog', { name: 'Edit tag' }));
+        fireEvent.change(editor.getByLabelText('Name'), { target: { value: 'Bar' } });
+        fireEvent.click(editor.getByRole('button', { name: 'Save' }));
+        expect(await editor.findByRole('alert')).toHaveTextContent('Name has already been taken');
+    });
+
+    it('deletes a tag after confirming and drops it from the filter', async () => {
+        let deleted = false;
+        const { calls, count } = renderDashboard(null, placesFor, {
+            'GET /api/tags': () => (deleted ? [tagRow(bar, 1)] : [tagRow(coffee, 1), tagRow(bar, 1)]),
+            'DELETE /api/tags/1': () => { deleted = true; return new Response(null, { status: 204 }); },
+        });
+        fireEvent.click(await tagButton('Coffee'));
+        await vi.waitFor(() => expect(screen.getAllByTestId('marker')).toHaveLength(1));
+
+        fireEvent.click(screen.getByRole('button', { name: 'Edit Coffee' }));
+        const editor = within(await screen.findByRole('dialog', { name: 'Edit tag' }));
+        fireEvent.click(editor.getByRole('button', { name: 'Delete' }));
+        fireEvent.click(editor.getByRole('button', { name: 'Cancel' }));
+        expect(count('DELETE', '/api/tags/1')).toBe(0);
+        fireEvent.click(editor.getByRole('button', { name: 'Delete' }));
+        fireEvent.click(editor.getByRole('button', { name: 'Delete this tag?' }));
+
+        await vi.waitFor(() => expect(screen.queryByRole('button', { name: /^Coffee\b/ })).not.toBeInTheDocument());
+        expect(count('DELETE', '/api/tags/1')).toBe(1);
+        // The filter dropped the deleted tag, so every place shows again.
+        await vi.waitFor(() => expect(screen.getAllByTestId('marker')).toHaveLength(3));
+        expect(placeQueries(calls).slice(-1)).toEqual(['']);
     });
 });
