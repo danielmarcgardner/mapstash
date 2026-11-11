@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AppShell, Loader, Paper, Text } from "@mantine/core";
 import { AdvancedMarker, APIProvider, Map as GoogleMap, Pin, useMap } from "@vis.gl/react-google-maps";
 import AppShellComponent from "./AppShell";
 import SideBar from "./SideBar";
+import PlaceDetail from "./PlaceDetail";
 import { useGetPlacesQuery } from "../state/api/placeApi";
 import type { Place } from "../types/place";
 
@@ -42,6 +43,18 @@ const FitToPlaces = ({ places }: { places: MappablePlace[] }) => {
     return null;
 };
 
+// Pans to the selected place; keyed on id so refetches of the same place don't re-pan.
+const PanToPlace = ({ place }: { place: MappablePlace | undefined }) => {
+    const map = useMap();
+    const id = place?.id;
+
+    useEffect(() => {
+        if (map && place) map.panTo({ lat: place.lat, lng: place.lng });
+    }, [map, id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    return null;
+};
+
 const MapOverlay = ({ children, alert = false }: { children: React.ReactNode; alert?: boolean }) => (
     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
         <Paper shadow="md" p="md" radius="md" className="pointer-events-auto text-center" role={alert ? "alert" : undefined}>
@@ -56,6 +69,9 @@ const Dashboard = () => {
         () => (places ?? []).filter((p): p is MappablePlace => p.lat !== null && p.lng !== null),
         [places],
     );
+    const [selectedId, setSelectedId] = useState<number | null>(null);
+    // Derived from query data, so a deleted place deselects itself after the refetch.
+    const selectedPlace = mappable.find(p => p.id === selectedId);
 
     return (
         <AppShellComponent>
@@ -68,14 +84,18 @@ const Dashboard = () => {
                             {mappable.map(place => {
                                 const color = place.tags[0]?.color;
                                 return (
-                                    <AdvancedMarker key={place.id} position={{ lat: place.lat, lng: place.lng }} title={place.title}>
+                                    <AdvancedMarker key={place.id} position={{ lat: place.lat, lng: place.lng }} title={place.title}
+                                        onClick={() => setSelectedId(place.id)}>
                                         <Pin background={color} borderColor={color} glyphColor={color && "#ffffff"} />
                                     </AdvancedMarker>
                                 );
                             })}
                         </GoogleMap>
                         {isSuccess && <FitToPlaces places={mappable} />}
+                        <PanToPlace place={selectedPlace} />
                     </APIProvider>
+
+                    <PlaceDetail place={selectedPlace} onClose={() => setSelectedId(null)} />
 
                     {isLoading && (
                         <MapOverlay>
