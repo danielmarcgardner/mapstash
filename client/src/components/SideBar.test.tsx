@@ -16,7 +16,7 @@ const renderSideBar = () => {
         <MantineProvider>
             <Provider store={store}>
                 <AppShell navbar={{ width: 200, breakpoint: 'sm' }}>
-                    <SideBar />
+                    <SideBar tagFilter={[]} onTagFilterChange={() => {}} />
                 </AppShell>
             </Provider>
         </MantineProvider>,
@@ -39,11 +39,11 @@ describe('SideBar', () => {
         });
         const store = renderSideBar();
 
-        expect(await screen.findByText('Brunch')).toBeInTheDocument();
+        expect(await screen.findByRole('button', { name: 'Brunch 0' })).toBeInTheDocument(); // name plus places count
         expect(await screen.findByText('SF Trip')).toBeInTheDocument();
 
         await act(() => store.dispatch(tagApi.endpoints.createTag.initiate({ name: 'Coffee', color: '#fff' })));
-        expect(await screen.findByText('Coffee')).toBeInTheDocument();
+        expect(await screen.findByRole('button', { name: 'Coffee 0' })).toBeInTheDocument();
     });
 
     it('shows an error, not an empty state, when loading fails', async () => {

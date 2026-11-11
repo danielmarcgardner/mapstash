@@ -65,7 +65,8 @@ const MapOverlay = ({ children, alert = false }: { children: React.ReactNode; al
 );
 
 const Dashboard = () => {
-    const { data: places, isLoading, isError, isSuccess } = useGetPlacesQuery();
+    const [tagFilter, setTagFilter] = useState<number[]>([]);
+    const { data: places, isLoading, isError, isSuccess } = useGetPlacesQuery(tagFilter.length ? { tag_ids: tagFilter } : undefined);
     const mappable = useMemo(
         () => (places ?? []).filter((p): p is MappablePlace => p.lat !== null && p.lng !== null),
         [places],
@@ -77,7 +78,7 @@ const Dashboard = () => {
 
     return (
         <AppShellComponent onAddPlace={() => setFormPlace("new")}>
-            <SideBar />
+            <SideBar tagFilter={tagFilter} onTagFilterChange={setTagFilter} />
 
             <AppShell.Main className="p-0">
                 <div className="relative w-full h-[calc(100vh-60px)]">
@@ -120,8 +121,14 @@ const Dashboard = () => {
                     )}
                     {isSuccess && mappable.length === 0 && (
                         <MapOverlay>
-                            <Text fw={600}>No places yet</Text>
-                            <Text size="sm" c="dimmed">Add your first place to see it on the map.</Text>
+                            {tagFilter.length ? (
+                                <Text fw={600}>No places with these tags</Text>
+                            ) : (
+                                <>
+                                    <Text fw={600}>No places yet</Text>
+                                    <Text size="sm" c="dimmed">Add your first place to see it on the map.</Text>
+                                </>
+                            )}
                         </MapOverlay>
                     )}
                 </div>
