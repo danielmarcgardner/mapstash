@@ -1,12 +1,12 @@
-import { AppShell, Group, Avatar, Input, Menu, Title, UnstyledButton } from "@mantine/core";
-import { IconLogout, IconSearch } from "@tabler/icons-react";
+import { AppShell, Group, Avatar, Button, Input, Menu, Title, UnstyledButton } from "@mantine/core";
+import { IconLogout, IconPlus, IconSearch } from "@tabler/icons-react";
 import { useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { useGetCurrentUserQuery, useLogoutMutation } from '../state/api/authApi';
 import { endSession } from '../state/api/baseApi';
 import { LOGIN } from '../constants/routes';
 
-const Header = () => {
+const Header = ({ onAddPlace }: { onAddPlace: () => void }) => {
     const { data: currentUser } = useGetCurrentUserQuery();
     const [logout] = useLogoutMutation();
     const dispatch = useDispatch();
@@ -32,6 +32,7 @@ const Header = () => {
     <AppShell.Header className="flex items-center justify-between px-4 border-b border-gray-200 bg-white">
         <Title order={3}>MapStash</Title>
         <Group gap="sm">
+            <Button leftSection={<IconPlus size={16} />} onClick={onAddPlace}>Add place</Button>
             <Input
                 leftSection={<IconSearch size={16} />}
                 placeholder="Search places"

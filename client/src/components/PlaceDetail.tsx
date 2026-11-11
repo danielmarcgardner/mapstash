@@ -4,9 +4,9 @@ import { useDeletePlaceMutation } from "../state/api/placeApi";
 import { useGetListsQuery } from "../state/api/listApi";
 import type { Place } from "../types/place";
 
-type Props = { place: Place | undefined; onClose: () => void };
+type Props = { place: Place | undefined; onClose: () => void; onEdit: () => void };
 
-const PlaceDetail = ({ place, onClose }: Props) => {
+const PlaceDetail = ({ place, onClose, onEdit }: Props) => {
     const { data: lists = [] } = useGetListsQuery();
     const [deletePlace, { isLoading: deleting }] = useDeletePlaceMutation();
     const [confirming, setConfirming] = useState(false);
@@ -68,6 +68,7 @@ const PlaceDetail = ({ place, onClose }: Props) => {
                         </Button>
                     )}
 
+                    <Button variant="default" onClick={onEdit}>Edit</Button>
                     {error && <Alert color="red" role="alert">Couldn't delete this place. Please try again.</Alert>}
                     {confirming ? (
                         <Group grow>

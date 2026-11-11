@@ -1,4 +1,5 @@
 import { MantineProvider } from '@mantine/core';
+import { Notifications } from '@mantine/notifications';
 import { render } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { Provider } from 'react-redux';
@@ -9,6 +10,7 @@ import { makeStore } from '../state/store';
 export const renderWithStore = (ui: ReactNode, store = makeStore()) => {
     render(
         <MantineProvider>
+            <Notifications />
             <Provider store={store}>
                 <MemoryRouter initialEntries={['/']}>
                     <Routes>

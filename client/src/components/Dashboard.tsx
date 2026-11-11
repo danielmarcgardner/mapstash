@@ -4,6 +4,7 @@ import { AdvancedMarker, APIProvider, Map as GoogleMap, Pin, useMap } from "@vis
 import AppShellComponent from "./AppShell";
 import SideBar from "./SideBar";
 import PlaceDetail from "./PlaceDetail";
+import PlaceForm from "./PlaceForm";
 import { useGetPlacesQuery } from "../state/api/placeApi";
 import type { Place } from "../types/place";
 
@@ -72,9 +73,10 @@ const Dashboard = () => {
     const [selectedId, setSelectedId] = useState<number | null>(null);
     // Derived from query data, so a deleted place deselects itself after the refetch.
     const selectedPlace = mappable.find(p => p.id === selectedId);
+    const [formPlace, setFormPlace] = useState<Place | "new" | null>(null);
 
     return (
-        <AppShellComponent>
+        <AppShellComponent onAddPlace={() => setFormPlace("new")}>
             <SideBar />
 
             <AppShell.Main className="p-0">
@@ -93,9 +95,17 @@ const Dashboard = () => {
                         </GoogleMap>
                         {isSuccess && <FitToPlaces places={mappable} />}
                         <PanToPlace place={selectedPlace} />
+                        {formPlace && (
+                            <PlaceForm
+                                key={formPlace === "new" ? "new" : formPlace.id}
+                                place={formPlace === "new" ? undefined : formPlace}
+                                onClose={() => setFormPlace(null)}
+                                onSaved={saved => { setFormPlace(null); setSelectedId(saved.id); }}
+                            />
+                        )}
                     </APIProvider>
 
-                    <PlaceDetail place={selectedPlace} onClose={() => setSelectedId(null)} />
+                    <PlaceDetail place={selectedPlace} onClose={() => setSelectedId(null)} onEdit={() => setFormPlace(selectedPlace ?? null)} />
 
                     {isLoading && (
                         <MapOverlay>
