@@ -169,6 +169,13 @@ describe('Place details', () => {
         expect(map.panTo).toHaveBeenCalledWith({ lat: 31, lng: -81 });
     });
 
+    it('keeps the place on screen while the drawer closes', async () => {
+        renderDashboard([detailed]);
+        fireEvent.keyDown(await openMarker('Place 1'), { key: 'Escape' });
+        expect(screen.getByText('123 Peachtree St')).toBeInTheDocument(); // still animating out, not blank
+        await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    });
+
     it('opens the saved link in a new tab', async () => {
         renderDashboard([detailed]);
         const link = within(await openMarker('Place 1')).getByRole('link', { name: 'Open link' });
@@ -190,7 +197,7 @@ describe('Place details', () => {
         const drawer = within(await openMarker('Place 1'));
         fireEvent.click(drawer.getByRole('button', { name: 'Delete' }));
         expect(count('DELETE', '/api/places/1')).toBe(0);
-        fireEvent.click(drawer.getByRole('button', { name: 'Confirm delete' }));
+        fireEvent.click(drawer.getByRole('button', { name: 'Delete this place?' }));
         await vi.waitFor(() => expect(screen.getAllByTestId('marker')).toHaveLength(1));
         expect(count('DELETE', '/api/places/1')).toBe(1);
         expect(count('GET', '/api/places')).toBe(2); // refetched, not reloaded
@@ -210,7 +217,7 @@ describe('Place details', () => {
         renderDashboard([detailed], undefined, { 'DELETE /api/places/1': () => jsonResponse(500) });
         const drawer = within(await openMarker('Place 1'));
         fireEvent.click(drawer.getByRole('button', { name: 'Delete' }));
-        fireEvent.click(drawer.getByRole('button', { name: 'Confirm delete' }));
+        fireEvent.click(drawer.getByRole('button', { name: 'Delete this place?' }));
         expect(await drawer.findByRole('alert')).toHaveTextContent("Couldn't delete this place");
         expect(screen.getByRole('dialog')).toBeInTheDocument();
         expect(screen.getAllByTestId('marker')).toHaveLength(1);
