@@ -9,10 +9,10 @@ import { renderWithStore } from '../test/renderWithStore';
 
 const user = { id: 1, email: 'a@b.co', first_name: 'ada', last_name: 'lovelace' };
 
-const renderHeader = () => {
+const renderHeader = (onAddPlace = vi.fn()) => {
     const store = makeStore();
     store.dispatch(loginSuccess({ user, token: 'abc' }));
-    renderWithStore(<AppShell header={{ height: 60 }}><Header /></AppShell>, store);
+    renderWithStore(<AppShell header={{ height: 60 }}><Header onAddPlace={onAddPlace} /></AppShell>, store);
     return store;
 };
 
@@ -58,5 +58,13 @@ describe('Header', () => {
 
         expect(await screen.findByText('Login page')).toBeInTheDocument();
         expect(store.getState().auth.token).toBeNull();
+    });
+
+    it('opens the place form from Add place', async () => {
+        stubFetch({ 'GET /api/users/me': () => user });
+        const onAddPlace = vi.fn();
+        renderHeader(onAddPlace);
+        fireEvent.click(await screen.findByRole('button', { name: 'Add place' }));
+        expect(onAddPlace).toHaveBeenCalledOnce();
     });
 });

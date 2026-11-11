@@ -16,6 +16,17 @@ vi.mock('@vis.gl/react-google-maps', () => ({
     ),
     Pin: ({ background }: { background?: string }) => <span data-testid="pin" data-background={background ?? ''} />,
     useMap: () => map,
+    useMapsLibrary: () => placesLib,
+}));
+
+// A fake Places API (New): one prediction for "Sammy's", whose place resolves to canned fields.
+const sammys = {
+    id: 'gp-sammys', displayName: "Sammy's Sandwich Shop", formattedAddress: '1 Peachtree St NE, Atlanta, GA',
+    location: { lat: () => 33.7537, lng: () => -84.3863 },
+};
+const placesLib = vi.hoisted(() => ({
+    AutocompleteSessionToken: class {},
+    AutocompleteSuggestion: { fetchAutocompleteSuggestions: vi.fn() },
 }));
 
 class FakeBounds {
@@ -56,6 +67,15 @@ const refetchPlaces = async (store: ReturnType<typeof renderWithStore>, count: (
 const geolocation = { getCurrentPosition: vi.fn() };
 
 beforeEach(() => {
+    placesLib.AutocompleteSuggestion.fetchAutocompleteSuggestions.mockImplementation(async ({ input }: { input: string }) => ({
+        suggestions: input.includes('Sammy') ? [{
+            placePrediction: {
+                placeId: sammys.id,
+                text: { toString: () => "Sammy's Sandwich Shop, Atlanta, GA" },
+                toPlace: () => ({ ...sammys, fetchFields: async () => ({}) }),
+            },
+        }] : [],
+    }));
     vi.stubGlobal('google', { maps: { LatLngBounds: FakeBounds } });
     Object.defineProperty(navigator, 'geolocation', { value: geolocation, configurable: true });
 });
@@ -221,5 +241,136 @@ describe('Place details', () => {
         expect(await drawer.findByRole('alert')).toHaveTextContent("Couldn't delete this place");
         expect(screen.getByRole('dialog')).toBeInTheDocument();
         expect(screen.getAllByTestId('marker')).toHaveLength(1);
+    });
+});
+
+describe('Place form', () => {
+    const created = place(9, {
+        title: "Sammy's Sandwich Shop", address: sammys.formattedAddress, location_name: sammys.displayName,
+        lat: 33.7537, lng: -84.3863, google_place_id: sammys.id,
+    });
+
+    const searchFor = async (text: string, option: string) => {
+        const input = screen.getByPlaceholderText('Search for a place');
+        await vi.waitFor(() => expect(input).toHaveFocus()); // the modal focuses the search, which opens the dropdown
+        fireEvent.change(input, { target: { value: text } });
+        // jsdom has no layout, so Mantine's Popover thinks the input is detached and hides the dropdown.
+        fireEvent.click(await screen.findByRole('option', { name: option, hidden: true }));
+    };
+    const save = () => fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    it('adds a place from a location search and selects it on the map', async () => {
+        let saved = false;
+        const { calls } = renderDashboard(null, () => (saved ? [place(1), created] : [place(1)]), {
+            'POST /api/places': () => { saved = true; return created; },
+        });
+        fireEvent.click(await screen.findByRole('button', { name: 'Add place' }));
+        await searchFor("Sammy's Sandwich Shop Atlanta", "Sammy's Sandwich Shop, Atlanta, GA");
+        await vi.waitFor(() => expect(screen.getByLabelText('Title')).toHaveValue("Sammy's Sandwich Shop"));
+        expect(screen.getByText(sammys.formattedAddress)).toBeInTheDocument();
+        save();
+
+        await vi.waitFor(() => expect(screen.getAllByTestId('marker')).toHaveLength(2));
+        expect(calls.find(c => c.method === 'POST')?.body).toEqual({
+            place: expect.objectContaining({
+                title: "Sammy's Sandwich Shop", address: sammys.formattedAddress, location_name: sammys.displayName,
+                lat: 33.7537, lng: -84.3863, google_place_id: sammys.id,
+            }),
+        });
+        expect(await screen.findByText('Place saved')).toBeInTheDocument();
+        expect(within(await screen.findByRole('dialog', { name: "Sammy's Sandwich Shop" })).getByText(sammys.formattedAddress)).toBeInTheDocument();
+        await vi.waitFor(() => expect(map.panTo).toHaveBeenCalledWith({ lat: 33.7537, lng: -84.3863 }));
+    });
+
+    it("edits a place's notes and shows them in its details", async () => {
+        let notes = 'Old notes';
+        // The serializer shows a placeholder for a missing address; an edit mustn't save it back.
+        const { calls } = renderDashboard(null, () => [place(1, { notes, description: 'Old description', address: 'No address provided' })], {
+            'PATCH /api/places/1': (body) => { notes = (body as { place: { notes: string } }).place.notes; return place(1, { notes }); },
+        });
+        fireEvent.click((await screen.findAllByTestId('marker'))[0]);
+        fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+        const notesField = await screen.findByLabelText('Notes');
+        expect(notesField).toHaveValue('Old notes');
+        expect(screen.getByLabelText('Title')).toHaveValue('Place 1');
+        fireEvent.change(notesField, { target: { value: 'Get the Cuban' } });
+        fireEvent.change(screen.getByLabelText('Description'), { target: { value: '' } });
+        save();
+
+        // Only the changed fields, with a cleared one sent as null.
+        await vi.waitFor(() => expect(calls.find(c => c.method === 'PATCH')?.body).toEqual({ place: { notes: 'Get the Cuban', description: null } }));
+        expect(await within(await screen.findByRole('dialog', { name: 'Place 1' })).findByText('Get the Cuban')).toBeInTheDocument();
+    });
+
+    it('shows the API error in the form and stays open', async () => {
+        renderDashboard([], undefined, {
+            'POST /api/places': () => jsonResponse(422, { errors: ["Title can't be blank"] }),
+        });
+        fireEvent.click(await screen.findByRole('button', { name: 'Add place' }));
+        await searchFor("Sammy's", "Sammy's Sandwich Shop, Atlanta, GA");
+        save();
+        const form = within(screen.getByRole('dialog', { name: 'Add place' }));
+        expect(await form.findByRole('alert')).toHaveTextContent("Title can't be blank");
+    });
+
+    it('requires a location and an http(s) link before saving', async () => {
+        const { count } = renderDashboard([]);
+        fireEvent.click(await screen.findByRole('button', { name: 'Add place' }));
+        fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Somewhere' } });
+        fireEvent.change(screen.getByLabelText('Link'), { target: { value: 'ftp://nope' } });
+        save();
+        expect(await screen.findByText('Pick a location from the search')).toBeInTheDocument();
+        expect(screen.getByText('Enter an http(s) URL')).toBeInTheDocument();
+        expect(count('POST', '/api/places')).toBe(0);
+    });
+});
+
+describe('Place form location picks', () => {
+    const prediction = (id: string, label: string, fetchFields: () => Promise<unknown>, fields: object) => ({
+        placePrediction: { placeId: id, text: { toString: () => label }, toPlace: () => ({ id, ...fields, fetchFields }) },
+    });
+    const openAndSearch = async () => {
+        renderDashboard([]);
+        fireEvent.click(await screen.findByRole('button', { name: 'Add place' }));
+        const input = screen.getByPlaceholderText('Search for a place');
+        await vi.waitFor(() => expect(input).toHaveFocus());
+        fireEvent.change(input, { target: { value: 'Sam' } });
+        return input;
+    };
+    // jsdom has no layout, so Mantine's Popover hides the dropdown; see searchFor above.
+    const pick = async (input: HTMLElement, name: string) => {
+        fireEvent.click(input);
+        fireEvent.click(await screen.findByRole('option', { name, hidden: true }));
+    };
+
+    it("tells the user when a place's details fail to load, and won't save it", async () => {
+        placesLib.AutocompleteSuggestion.fetchAutocompleteSuggestions.mockResolvedValue({
+            suggestions: [prediction('a', 'Broken place', () => Promise.reject(new Error('quota')), { displayName: 'Broken' })],
+        });
+        const input = await openAndSearch();
+        await pick(input, 'Broken place');
+        expect(await screen.findByText("Couldn't load that place. Try searching again.")).toBeInTheDocument();
+        expect(screen.getByLabelText('Title')).toHaveValue('');
+    });
+
+    it('keeps the latest pick when an earlier one resolves last', async () => {
+        let resolveSlow = () => {};
+        placesLib.AutocompleteSuggestion.fetchAutocompleteSuggestions.mockResolvedValue({
+            suggestions: [
+                prediction('slow', 'Slow place', () => new Promise<void>(r => { resolveSlow = r; }),
+                    { displayName: 'Slow', formattedAddress: 'Slow St', location: { lat: () => 1, lng: () => 1 } }),
+                prediction('fast', 'Fast place', async () => ({}),
+                    { displayName: 'Fast', formattedAddress: 'Fast St', location: { lat: () => 2, lng: () => 2 } }),
+            ],
+        });
+        const input = await openAndSearch();
+        await pick(input, 'Slow place');
+        await pick(input, 'Fast place');
+        await vi.waitFor(() => expect(screen.getByText('Fast St')).toBeInTheDocument());
+        resolveSlow();
+        await new Promise(r => setTimeout(r, 0));
+        expect(screen.getByText('Fast St')).toBeInTheDocument();
+        expect(screen.queryByText('Slow St')).not.toBeInTheDocument();
+        expect(screen.getByLabelText('Title')).toHaveValue('Fast');
     });
 });

@@ -2,7 +2,7 @@ import { AppShell } from "@mantine/core";
 import Header from "./Header";
 import type { ReactNode } from "react";
 
-const AppShellComponent = ({ children }: { children: ReactNode }) => {
+const AppShellComponent = ({ children, onAddPlace }: { children: ReactNode; onAddPlace: () => void }) => {
     return (
         <AppShell
             header={{
@@ -14,7 +14,7 @@ const AppShellComponent = ({ children }: { children: ReactNode }) => {
             }}
             padding="md"
             >
-            <Header />
+            <Header onAddPlace={onAddPlace} />
             {children}
         </AppShell>
     );
