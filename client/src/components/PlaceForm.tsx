@@ -5,7 +5,7 @@ import { useDebouncedValue } from "@mantine/hooks";
 import { notifications } from "@mantine/notifications";
 import { useMapsLibrary } from "@vis.gl/react-google-maps";
 import { useCreatePlaceMutation, useUpdatePlaceMutation } from "../state/api/placeApi";
-import type { Place } from "../types/place";
+import type { CreatePlacePayload, Place } from "../types/place";
 import type { AuthError } from "../types/user";
 
 type Props = { place?: Place; onClose: () => void; onSaved: (place: Place) => void };
@@ -30,6 +30,7 @@ const PlaceForm = ({ place, onClose, onSaved }: Props) => {
     const [predictions, setPredictions] = useState<google.maps.places.PlacePrediction[]>([]);
     const [pickedLabel, setPickedLabel] = useState<string | null>(null);
     const sessionToken = useRef<google.maps.places.AutocompleteSessionToken | null>(null);
+    const latestPick = useRef(0);
 
     const form = useForm({
         initialValues: {
@@ -66,9 +67,18 @@ const PlaceForm = ({ place, onClose, onSaved }: Props) => {
     const pickLocation = async (placeId: string | null) => {
         const prediction = predictions.find(p => p.placeId === placeId);
         if (!prediction) return;
+        const pick = ++latestPick.current;
         setPickedLabel(prediction.text.toString());
+        // Clear the old location so a failed or pending pick can't be saved with stale coordinates.
+        form.setValues({ location_name: "", address: "", lat: null, lng: null, google_place_id: "" });
         const picked = prediction.toPlace();
-        await picked.fetchFields({ fields: ["displayName", "formattedAddress", "location"] });
+        try {
+            await picked.fetchFields({ fields: ["displayName", "formattedAddress", "location"] });
+        } catch {
+            if (pick === latestPick.current) form.setFieldError("lat", "Couldn't load that place. Try searching again.");
+            return;
+        }
+        if (pick !== latestPick.current) return; // a newer pick won the race
         sessionToken.current = null; // a session ends once a place's details are fetched
         const name = picked.displayName ?? "";
         form.setValues({
@@ -77,13 +87,18 @@ const PlaceForm = ({ place, onClose, onSaved }: Props) => {
             lat: picked.location?.lat() ?? null,
             lng: picked.location?.lng() ?? null,
             google_place_id: picked.id,
-            ...(form.values.title.trim() ? {} : { title: name }),
+            ...(form.getValues().title.trim() ? {} : { title: name }),
         });
+        form.clearFieldError("lat");
     };
 
     const handleSubmit = async (values: typeof form.values) => {
         setSubmitError(null);
-        const payload = { ...values, lat: values.lat!, lng: values.lng! }; // validation guarantees both
+        // Edits send only changed fields, so display-only values (like a missing address's placeholder) aren't saved back.
+        const fields = Object.entries(values).filter(([key]) => !place || form.isDirty(key));
+        // Blank optional fields are stored as null, not "". Built per key, so TS can't see the shape:
+        // title and lat/lng are guaranteed by validation, and the API accepts null for the rest.
+        const payload = Object.fromEntries(fields.map(([key, value]) => [key, value === "" ? null : value])) as unknown as CreatePlacePayload;
         try {
             const saved = place
                 ? await updatePlace({ id: place.id, ...payload }).unwrap()

@@ -284,7 +284,8 @@ describe('Place form', () => {
 
     it("edits a place's notes and shows them in its details", async () => {
         let notes = 'Old notes';
-        const { calls } = renderDashboard(null, () => [place(1, { notes })], {
+        // The serializer shows a placeholder for a missing address; an edit mustn't save it back.
+        const { calls } = renderDashboard(null, () => [place(1, { notes, description: 'Old description', address: 'No address provided' })], {
             'PATCH /api/places/1': (body) => { notes = (body as { place: { notes: string } }).place.notes; return place(1, { notes }); },
         });
         fireEvent.click((await screen.findAllByTestId('marker'))[0]);
@@ -293,9 +294,11 @@ describe('Place form', () => {
         expect(notesField).toHaveValue('Old notes');
         expect(screen.getByLabelText('Title')).toHaveValue('Place 1');
         fireEvent.change(notesField, { target: { value: 'Get the Cuban' } });
+        fireEvent.change(screen.getByLabelText('Description'), { target: { value: '' } });
         save();
 
-        await vi.waitFor(() => expect(calls.find(c => c.method === 'PATCH')?.body).toEqual({ place: expect.objectContaining({ notes: 'Get the Cuban' }) }));
+        // Only the changed fields, with a cleared one sent as null.
+        await vi.waitFor(() => expect(calls.find(c => c.method === 'PATCH')?.body).toEqual({ place: { notes: 'Get the Cuban', description: null } }));
         expect(await within(await screen.findByRole('dialog', { name: 'Place 1' })).findByText('Get the Cuban')).toBeInTheDocument();
     });
 
@@ -319,5 +322,55 @@ describe('Place form', () => {
         expect(await screen.findByText('Pick a location from the search')).toBeInTheDocument();
         expect(screen.getByText('Enter an http(s) URL')).toBeInTheDocument();
         expect(count('POST', '/api/places')).toBe(0);
+    });
+});
+
+describe('Place form location picks', () => {
+    const prediction = (id: string, label: string, fetchFields: () => Promise<unknown>, fields: object) => ({
+        placePrediction: { placeId: id, text: { toString: () => label }, toPlace: () => ({ id, ...fields, fetchFields }) },
+    });
+    const openAndSearch = async () => {
+        renderDashboard([]);
+        fireEvent.click(await screen.findByRole('button', { name: 'Add place' }));
+        const input = screen.getByPlaceholderText('Search for a place');
+        await vi.waitFor(() => expect(input).toHaveFocus());
+        fireEvent.change(input, { target: { value: 'Sam' } });
+        return input;
+    };
+    // jsdom has no layout, so Mantine's Popover hides the dropdown; see searchFor above.
+    const pick = async (input: HTMLElement, name: string) => {
+        fireEvent.click(input);
+        fireEvent.click(await screen.findByRole('option', { name, hidden: true }));
+    };
+
+    it("tells the user when a place's details fail to load, and won't save it", async () => {
+        placesLib.AutocompleteSuggestion.fetchAutocompleteSuggestions.mockResolvedValue({
+            suggestions: [prediction('a', 'Broken place', () => Promise.reject(new Error('quota')), { displayName: 'Broken' })],
+        });
+        const input = await openAndSearch();
+        await pick(input, 'Broken place');
+        expect(await screen.findByText("Couldn't load that place. Try searching again.")).toBeInTheDocument();
+        expect(screen.getByLabelText('Title')).toHaveValue('');
+    });
+
+    it('keeps the latest pick when an earlier one resolves last', async () => {
+        let resolveSlow = () => {};
+        placesLib.AutocompleteSuggestion.fetchAutocompleteSuggestions.mockResolvedValue({
+            suggestions: [
+                prediction('slow', 'Slow place', () => new Promise<void>(r => { resolveSlow = r; }),
+                    { displayName: 'Slow', formattedAddress: 'Slow St', location: { lat: () => 1, lng: () => 1 } }),
+                prediction('fast', 'Fast place', async () => ({}),
+                    { displayName: 'Fast', formattedAddress: 'Fast St', location: { lat: () => 2, lng: () => 2 } }),
+            ],
+        });
+        const input = await openAndSearch();
+        await pick(input, 'Slow place');
+        await pick(input, 'Fast place');
+        await vi.waitFor(() => expect(screen.getByText('Fast St')).toBeInTheDocument());
+        resolveSlow();
+        await new Promise(r => setTimeout(r, 0));
+        expect(screen.getByText('Fast St')).toBeInTheDocument();
+        expect(screen.queryByText('Slow St')).not.toBeInTheDocument();
+        expect(screen.getByLabelText('Title')).toHaveValue('Fast');
     });
 });
