@@ -33,7 +33,7 @@ MapStash is an app for saving your favorite places for future adventures: a Rail
 |---|---|
 | App (Vite dev server) | http://localhost:3001 |
 | API (Rails) | http://localhost:3000 |
-| Health check | http://localhost:3000/api/up |
+| Health check | http://localhost:3000/up |
 
 **Seed login:** `test@example.com` / `12345678`
 

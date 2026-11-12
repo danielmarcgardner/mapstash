@@ -1,6 +1,10 @@
 # Idempotent: every record is found or created, scoped to the seed user, so running this twice changes nothing.
 # Never delete here; fix bad dev data by hand.
 
+# Dev and test data only: Render's preDeployCommand (db:prepare) seeds a new database, and the seed
+# user's known password must never exist in production.
+return if Rails.env.production?
+
 user = User.find_or_create_by!(email: 'test@example.com') do |u|
   u.password = '12345678'
   u.first_name = 'Map'

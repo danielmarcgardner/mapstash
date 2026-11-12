@@ -77,4 +77,9 @@ RSpec.describe "db/seeds.rb", type: :request do
     get "/api/lists", headers: headers
     expect(response.parsed_body.size).to eq(4)
   end
+
+  it "seeds nothing in production, where the seed user's known password would be a real account" do
+    allow(Rails).to receive(:env).and_return(ActiveSupport::EnvironmentInquirer.new("production"))
+    expect { Rails.application.load_seed }.not_to change { counts }
+  end
 end
