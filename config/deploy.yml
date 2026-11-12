@@ -36,6 +36,9 @@ env:
   secret:
     - RAILS_MASTER_KEY
   clear:
+    # Sentry DSNs are public by design (the client one ships in the JS bundle), so they're fine in clear.
+    SENTRY_DSN: https://3159274b2ca4dff0c02d2b0f4c8a98dd@o4512420497260544.ingest.us.sentry.io/4512420511612928
+
     # Run the Solid Queue Supervisor inside the web server's Puma process to do jobs.
     # When you start using multiple servers, you should split out job processing to a dedicated machine.
     SOLID_QUEUE_IN_PUMA: true
@@ -75,6 +78,9 @@ asset_path: /rails/public/assets
 
 # Configure the image builder.
 builder:
+  # Vite bakes VITE_* vars into the client at build time.
+  args:
+    VITE_SENTRY_DSN: https://bcbfa7d702852ed2fa3d066a27fcb1e2@o4512420497260544.ingest.us.sentry.io/4512420511744000
   arch: amd64
 
   # # Build image via remote server (useful for faster amd64 builds on arm64 computers)
