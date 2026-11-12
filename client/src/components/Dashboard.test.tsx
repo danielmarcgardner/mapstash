@@ -14,6 +14,13 @@ const map = vi.hoisted(() => ({
     // Tests flip `inView` to put pins off screen.
     view: { inView: true },
     getBounds() { return { contains: () => this.view.inView }; },
+    handlers: [] as { event: string; fn: () => void }[],
+    addListener(event: string, fn: () => void) {
+        const handler = { event, fn };
+        this.handlers.push(handler);
+        return { remove: () => { this.handlers = this.handlers.filter(h => h !== handler); } };
+    },
+    emit(event: string) { this.handlers.filter(h => h.event === event).forEach(h => h.fn()); },
 }));
 vi.mock('@vis.gl/react-google-maps', async () => {
     const { useCallback } = await vi.importActual<typeof import('react')>('react');
@@ -120,6 +127,7 @@ beforeEach(() => {
     vi.stubGlobal('google', { maps: { LatLngBounds: FakeBounds } });
     clusterers.length = 0;
     map.view.inView = true;
+    map.handlers = [];
     Object.defineProperty(navigator, 'geolocation', { value: geolocation, configurable: true });
 });
 afterEach(() => {
@@ -402,7 +410,8 @@ describe('Place form', () => {
         const pinFor = (title: string) => screen.getAllByTestId('marker').find(m => m.title === title) as FakeMarker;
         const redraw = () => clusterers[clusterers.length - 1].emit('clusteringend');
 
-        it('zooms in only until a saved pin leaves its cluster, waiting while it is off screen', async () => {
+        // Saves Sammy's next to two places and returns its pin, selected and folded into a cluster.
+        const saveClusteredPlace = async () => {
             let saved = false;
             renderDashboard(null, () => (saved ? [place(1), place(2), created] : [place(1), place(2)]), {
                 'POST /api/places': () => { saved = true; return created; },
@@ -413,8 +422,12 @@ describe('Place form', () => {
             save();
             await screen.findByRole('dialog', { name: "Sammy's Sandwich Shop" });
             const pin = pinFor("Sammy's Sandwich Shop");
+            pin.map = null;
+            return pin;
+        };
 
-            pin.map = null; // folded into a cluster…
+        it('zooms in only until a saved pin leaves its cluster, waiting while it is off screen', async () => {
+            const pin = await saveClusteredPlace(); // folded into a cluster…
             map.view.inView = false; // …but the pan hasn't brought it on screen yet
             redraw();
             expect(map.setZoom).not.toHaveBeenCalled();
@@ -428,6 +441,15 @@ describe('Place form', () => {
             pin.map = null; // the user zooms back out: left alone
             redraw();
             expect(map.setZoom).toHaveBeenCalledOnce();
+        });
+
+        it('gives up if the user drags the map before the pin shows', async () => {
+            await saveClusteredPlace();
+            map.view.inView = false; // the pan is still on its way
+            map.emit('dragstart');
+            map.view.inView = true; // the pin later comes into view, still clustered
+            redraw();
+            expect(map.setZoom).not.toHaveBeenCalled();
         });
 
         it("doesn't change the zoom when the selected pin is already visible", async () => {

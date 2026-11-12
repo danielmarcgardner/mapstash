@@ -84,16 +84,20 @@ const useRevealSelected = (clusterer: MarkerClusterer | null, markers: MarkersBy
         if (!map || !clusterer || selectedId === null) return;
         const reveal = () => {
             const marker = markers.get(selectedId);
-            // Not drawn yet, or still off screen while the pan runs (the clusterer skips those too): wait.
+            // Not registered yet, or PanToPlace hasn't brought it on screen: wait, so we don't zoom around the wrong center.
             if (!marker?.position || !map.getBounds()?.contains(marker.position)) return false;
             if (marker.map) return true; // the clusterer shows it on its own
             map.setZoom((map.getZoom() ?? 0) + 1);
             return false;
         };
         if (reveal()) return;
-        // Removed once the pin shows, so a later zoom-out by the user is left alone.
-        const listener = clusterer.addListener("clusteringend", () => { if (reveal()) listener.remove(); });
-        return () => listener.remove();
+        // Stops once the pin shows, or once the user drags the map, so their own panning and zooming is left alone.
+        const listeners = [
+            clusterer.addListener("clusteringend", () => { if (reveal()) stop(); }),
+            map.addListener("dragstart", () => stop()),
+        ];
+        const stop = () => listeners.forEach(l => l.remove());
+        return stop;
     }, [map, clusterer, markers, selectedId]);
 };
 
@@ -119,7 +123,7 @@ const PlaceMarker = ({ place, clusterer, markers, onSelect }: {
 
 const ClusteredMarkers = ({ places, selectedId, onSelect }: { places: MappablePlace[]; selectedId: number | null; onSelect: (id: number) => void }) => {
     const clusterer = useClusterer();
-    const [markers] = useState<MarkersById>(() => new Map());
+    const markers = useRef<MarkersById>(new Map()).current;
     useRevealSelected(clusterer, markers, selectedId);
     return places.map(place => <PlaceMarker key={place.id} place={place} clusterer={clusterer} markers={markers} onSelect={onSelect} />);
 };
