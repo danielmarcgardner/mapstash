@@ -22,8 +22,9 @@ RUN --mount=type=secret,id=sentry_auth_token \
 # === Stage 2: Rails API ===
 FROM ruby:4.0.9 AS backend
 WORKDIR /app
-ENV RAILS_ENV=production
-RUN apt-get update -qq && apt-get install -y nodejs postgresql-client
+# Production gems only; the client is already built in stage 1, so no Node here.
+ENV RAILS_ENV=production BUNDLE_WITHOUT="development:test"
+RUN apt-get update -qq && apt-get install -y postgresql-client
 COPY Gemfile Gemfile.lock ./
 RUN gem install bundler && bundle install
 COPY . .
