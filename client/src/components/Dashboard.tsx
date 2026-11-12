@@ -72,13 +72,46 @@ const useClusterer = () => {
     return clusterer;
 };
 
-const PlaceMarker = ({ place, clusterer, onSelect }: { place: MappablePlace; clusterer: MarkerClusterer | null; onSelect: (id: number) => void }) => {
+type MarkerElement = google.maps.marker.AdvancedMarkerElement;
+type MarkersById = Map<number, MarkerElement>;
+
+// A selected pin folded into a cluster (e.g. a place just saved next to others) is hidden;
+// zoom in one level per redraw until the clusterer shows it on its own. Keyed on the id, like PanToPlace.
+const useRevealSelected = (clusterer: MarkerClusterer | null, markers: MarkersById, selectedId: number | null) => {
+    const map = useMap();
+
+    useEffect(() => {
+        if (!map || !clusterer || selectedId === null) return;
+        const reveal = () => {
+            const marker = markers.get(selectedId);
+            // Not registered yet, or PanToPlace hasn't brought it on screen: wait, so we don't zoom around the wrong center.
+            if (!marker?.position || !map.getBounds()?.contains(marker.position)) return false;
+            if (marker.map) return true; // the clusterer shows it on its own
+            map.setZoom((map.getZoom() ?? 0) + 1);
+            return false;
+        };
+        if (reveal()) return;
+        // Stops once the pin shows, or once the user drags the map, so their own panning and zooming is left alone.
+        const listeners = [
+            clusterer.addListener("clusteringend", () => { if (reveal()) stop(); }),
+            map.addListener("dragstart", () => stop()),
+        ];
+        const stop = () => listeners.forEach(l => l.remove());
+        return stop;
+    }, [map, clusterer, markers, selectedId]);
+};
+
+const PlaceMarker = ({ place, clusterer, markers, onSelect }: {
+    place: MappablePlace; clusterer: MarkerClusterer | null; markers: MarkersById; onSelect: (id: number) => void;
+}) => {
+    const { id } = place;
     // Stable per clusterer, so re-renders don't remove and re-add the marker.
-    const register = useCallback((marker: google.maps.marker.AdvancedMarkerElement | null) => {
+    const register = useCallback((marker: MarkerElement | null) => {
         if (!marker || !clusterer) return;
         clusterer.addMarker(marker);
-        return () => { clusterer.removeMarker(marker); };
-    }, [clusterer]);
+        markers.set(id, marker);
+        return () => { clusterer.removeMarker(marker); markers.delete(id); };
+    }, [clusterer, markers, id]);
     const color = place.tags[0]?.color;
     return (
         <AdvancedMarker ref={register} position={{ lat: place.lat, lng: place.lng }} title={place.title} onClick={() => onSelect(place.id)}>
@@ -88,9 +121,11 @@ const PlaceMarker = ({ place, clusterer, onSelect }: { place: MappablePlace; clu
     );
 };
 
-const ClusteredMarkers = ({ places, onSelect }: { places: MappablePlace[]; onSelect: (id: number) => void }) => {
+const ClusteredMarkers = ({ places, selectedId, onSelect }: { places: MappablePlace[]; selectedId: number | null; onSelect: (id: number) => void }) => {
     const clusterer = useClusterer();
-    return places.map(place => <PlaceMarker key={place.id} place={place} clusterer={clusterer} onSelect={onSelect} />);
+    const markers = useRef<MarkersById>(new Map()).current;
+    useRevealSelected(clusterer, markers, selectedId);
+    return places.map(place => <PlaceMarker key={place.id} place={place} clusterer={clusterer} markers={markers} onSelect={onSelect} />);
 };
 
 const MapOverlay = ({ children, alert = false }: { children: React.ReactNode; alert?: boolean }) => (
@@ -127,7 +162,7 @@ const Dashboard = () => {
                 <div className="relative w-full h-[calc(100vh-60px)]">
                     <APIProvider apiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}>
                         <GoogleMap mapId={MAP_ID} defaultCenter={DEFAULT_CENTER} defaultZoom={12} gestureHandling="greedy">
-                            <ClusteredMarkers places={mappable} onSelect={setSelectedId} />
+                            <ClusteredMarkers places={mappable} selectedId={selectedId} onSelect={setSelectedId} />
                         </GoogleMap>
                         {isSuccess && <FitToPlaces places={mappable} />}
                         <PanToPlace place={selectedPlace} />

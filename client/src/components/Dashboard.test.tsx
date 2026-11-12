@@ -8,30 +8,62 @@ import { baseApi } from '../state/api/baseApi';
 import { darken, TAG_PALETTE } from '../tagColors';
 
 // jsdom can't run Google Maps, so the library is replaced with inspectable stand-ins.
-const map = vi.hoisted(() => ({ fitBounds: vi.fn(), setCenter: vi.fn(), setZoom: vi.fn(), panTo: vi.fn() }));
-vi.mock('@vis.gl/react-google-maps', () => ({
+const map = vi.hoisted(() => ({
+    fitBounds: vi.fn(), setCenter: vi.fn(), setZoom: vi.fn(), panTo: vi.fn(),
+    getZoom: () => 12,
+    // Tests flip `inView` to put pins off screen.
+    view: { inView: true },
+    getBounds() { return { contains: () => this.view.inView }; },
+    handlers: [] as { event: string; fn: () => void }[],
+    addListener(event: string, fn: () => void) {
+        const handler = { event, fn };
+        this.handlers.push(handler);
+        return { remove: () => { this.handlers = this.handlers.filter(h => h !== handler); } };
+    },
+    emit(event: string) { this.handlers.filter(h => h.event === event).forEach(h => h.fn()); },
+}));
+vi.mock('@vis.gl/react-google-maps', async () => {
+    const { useCallback } = await vi.importActual<typeof import('react')>('react');
+    return {
     APIProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
     Map: ({ children }: { children: ReactNode }) => <div data-testid="map">{children}</div>,
     // The button stands in for the AdvancedMarkerElement handed to the ref.
-    AdvancedMarker: ({ ref, title, children, onClick }: { ref?: React.Ref<HTMLButtonElement>; title: string; children: ReactNode; onClick?: () => void }) => (
-        <button ref={ref} data-testid="marker" title={title} onClick={onClick}>{children}</button>
-    ),
+    AdvancedMarker: ({ ref, position, title, children, onClick }: {
+        ref?: (el: HTMLButtonElement | null) => (() => void) | void; position: object; title: string; children: ReactNode; onClick?: () => void;
+    }) => {
+        // Stable like the real ref, so re-renders don't re-register the marker.
+        const register = useCallback((el: HTMLButtonElement | null) => ref?.(el && Object.assign(el, { position })), [ref]); // eslint-disable-line react-hooks/exhaustive-deps
+        return <button ref={register} data-testid="marker" title={title} onClick={onClick}>{children}</button>;
+    },
     Pin: ({ background, borderColor, glyphColor }: { background?: string; borderColor?: string; glyphColor?: string }) => (
         <span data-testid="pin" data-background={background ?? ''} data-border={borderColor ?? ''} data-glyph={glyphColor ?? ''} />
     ),
     useMap: () => map,
     useMapsLibrary: () => placesLib,
-}));
+    };
+});
 
 // Records every clusterer the map builds, with the options and markers it was given.
-const clusterers = vi.hoisted(() => [] as { options: unknown; addMarker: ReturnType<typeof vi.fn>; removeMarker: ReturnType<typeof vi.fn>; setMap: ReturnType<typeof vi.fn> }[]);
+type FakeClusterer = {
+    options: unknown; addMarker: ReturnType<typeof vi.fn>; removeMarker: ReturnType<typeof vi.fn>; setMap: ReturnType<typeof vi.fn>;
+    emit: (event: string) => void;
+};
+const clusterers = vi.hoisted(() => [] as FakeClusterer[]);
 vi.mock('@googlemaps/markerclusterer', () => ({
     MarkerClusterer: class {
-        addMarker = vi.fn();
+        // Pins start shown on their own; a test sets `map = null` to fold one into a cluster.
+        addMarker = vi.fn((marker: { map?: unknown }) => { marker.map = map; });
         removeMarker = vi.fn();
         setMap = vi.fn();
         options: unknown;
+        handlers: { event: string; fn: () => void }[] = [];
         constructor(options: unknown) { this.options = options; clusterers.push(this); }
+        addListener(event: string, fn: () => void) {
+            const handler = { event, fn };
+            this.handlers.push(handler);
+            return { remove: () => { this.handlers = this.handlers.filter(h => h !== handler); } };
+        }
+        emit(event: string) { this.handlers.filter(h => h.event === event).forEach(h => h.fn()); }
     },
 }));
 
@@ -94,6 +126,8 @@ beforeEach(() => {
     }));
     vi.stubGlobal('google', { maps: { LatLngBounds: FakeBounds } });
     clusterers.length = 0;
+    map.view.inView = true;
+    map.handlers = [];
     Object.defineProperty(navigator, 'geolocation', { value: geolocation, configurable: true });
 });
 afterEach(() => {
@@ -369,6 +403,63 @@ describe('Place form', () => {
         expect(await screen.findByText('Pick a location from the search')).toBeInTheDocument();
         expect(screen.getByText('Enter an http(s) URL')).toBeInTheDocument();
         expect(count('POST', '/api/places')).toBe(0);
+    });
+
+    describe('revealing the selected place', () => {
+        type FakeMarker = HTMLElement & { map: unknown };
+        const pinFor = (title: string) => screen.getAllByTestId('marker').find(m => m.title === title) as FakeMarker;
+        const redraw = () => clusterers[clusterers.length - 1].emit('clusteringend');
+
+        // Saves Sammy's next to two places and returns its pin, selected and folded into a cluster.
+        const saveClusteredPlace = async () => {
+            let saved = false;
+            renderDashboard(null, () => (saved ? [place(1), place(2), created] : [place(1), place(2)]), {
+                'POST /api/places': () => { saved = true; return created; },
+            });
+            fireEvent.click(await screen.findByRole('button', { name: 'Add place' }));
+            await searchFor("Sammy's Sandwich Shop Atlanta", "Sammy's Sandwich Shop, Atlanta, GA");
+            await vi.waitFor(() => expect(screen.getByLabelText('Title')).toHaveValue("Sammy's Sandwich Shop"));
+            save();
+            await screen.findByRole('dialog', { name: "Sammy's Sandwich Shop" });
+            const pin = pinFor("Sammy's Sandwich Shop");
+            pin.map = null;
+            return pin;
+        };
+
+        it('zooms in only until a saved pin leaves its cluster, waiting while it is off screen', async () => {
+            const pin = await saveClusteredPlace(); // folded into a cluster…
+            map.view.inView = false; // …but the pan hasn't brought it on screen yet
+            redraw();
+            expect(map.setZoom).not.toHaveBeenCalled();
+
+            map.view.inView = true;
+            redraw();
+            expect(map.setZoom.mock.calls).toEqual([[13]]); // one level in from 12
+
+            pin.map = map; // shown on its own at 13
+            redraw();
+            pin.map = null; // the user zooms back out: left alone
+            redraw();
+            expect(map.setZoom).toHaveBeenCalledOnce();
+        });
+
+        it('gives up if the user drags the map before the pin shows', async () => {
+            await saveClusteredPlace();
+            map.view.inView = false; // the pan is still on its way
+            map.emit('dragstart');
+            map.view.inView = true; // the pin later comes into view, still clustered
+            redraw();
+            expect(map.setZoom).not.toHaveBeenCalled();
+        });
+
+        it("doesn't change the zoom when the selected pin is already visible", async () => {
+            renderDashboard([place(1), place(2)]);
+            await screen.findAllByTestId('marker');
+            fireEvent.click(pinFor('Place 1'));
+            await screen.findByRole('dialog', { name: 'Place 1' });
+            redraw();
+            expect(map.setZoom).not.toHaveBeenCalled();
+        });
     });
 });
 
