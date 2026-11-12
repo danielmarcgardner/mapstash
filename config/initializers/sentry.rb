@@ -1,7 +1,6 @@
 # Error monitoring, tracing and logs (on by default in sentry-ruby 7). Nothing is sent without SENTRY_DSN.
 Sentry.init do |config|
   config.dsn = ENV["SENTRY_DSN"]
-  config.environment = Rails.env
   # The test container loads .env too, so keep specs from reporting.
   config.enabled_environments = %w[development production]
   config.breadcrumbs_logger = [ :active_support_logger, :http_logger ]
