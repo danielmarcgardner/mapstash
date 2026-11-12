@@ -54,6 +54,14 @@ RSpec.describe "Tags", type: :request do
       expect(user.tags.pluck(:name)).to eq([ "Coffee" ])
     end
 
+    it "creates a tag with the given color" do
+      create_tag(name: "Coffee", color: "#e03131")
+
+      expect(response).to have_http_status(:created)
+      expect(response.parsed_body).to include("name" => "Coffee", "color" => "#e03131")
+      expect(user.tags.pluck(:color)).to eq([ "#e03131" ])
+    end
+
     it "returns 422 for a name the user already has in another case" do
       create(:tag, user: user, name: "Coffee")
 

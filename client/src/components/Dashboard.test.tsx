@@ -5,18 +5,34 @@ import Dashboard from './Dashboard';
 import { jsonResponse, stubFetch, type Route } from '../test/fetchStub';
 import { renderWithStore } from '../test/renderWithStore';
 import { baseApi } from '../state/api/baseApi';
+import { darken, TAG_PALETTE } from '../tagColors';
 
 // jsdom can't run Google Maps, so the library is replaced with inspectable stand-ins.
 const map = vi.hoisted(() => ({ fitBounds: vi.fn(), setCenter: vi.fn(), setZoom: vi.fn(), panTo: vi.fn() }));
 vi.mock('@vis.gl/react-google-maps', () => ({
     APIProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
     Map: ({ children }: { children: ReactNode }) => <div data-testid="map">{children}</div>,
-    AdvancedMarker: ({ title, children, onClick }: { title: string; children: ReactNode; onClick?: () => void }) => (
-        <button data-testid="marker" title={title} onClick={onClick}>{children}</button>
+    // The button stands in for the AdvancedMarkerElement handed to the ref.
+    AdvancedMarker: ({ ref, title, children, onClick }: { ref?: React.Ref<HTMLButtonElement>; title: string; children: ReactNode; onClick?: () => void }) => (
+        <button ref={ref} data-testid="marker" title={title} onClick={onClick}>{children}</button>
     ),
-    Pin: ({ background }: { background?: string }) => <span data-testid="pin" data-background={background ?? ''} />,
+    Pin: ({ background, borderColor, glyphColor }: { background?: string; borderColor?: string; glyphColor?: string }) => (
+        <span data-testid="pin" data-background={background ?? ''} data-border={borderColor ?? ''} data-glyph={glyphColor ?? ''} />
+    ),
     useMap: () => map,
     useMapsLibrary: () => placesLib,
+}));
+
+// Records every clusterer the map builds, with the options and markers it was given.
+const clusterers = vi.hoisted(() => [] as { options: unknown; addMarker: ReturnType<typeof vi.fn>; removeMarker: ReturnType<typeof vi.fn>; setMap: ReturnType<typeof vi.fn> }[]);
+vi.mock('@googlemaps/markerclusterer', () => ({
+    MarkerClusterer: class {
+        addMarker = vi.fn();
+        removeMarker = vi.fn();
+        setMap = vi.fn();
+        options: unknown;
+        constructor(options: unknown) { this.options = options; clusterers.push(this); }
+    },
 }));
 
 // A fake Places API (New): one prediction for "Sammy's", whose place resolves to canned fields.
@@ -77,6 +93,7 @@ beforeEach(() => {
         }] : [],
     }));
     vi.stubGlobal('google', { maps: { LatLngBounds: FakeBounds } });
+    clusterers.length = 0;
     Object.defineProperty(navigator, 'geolocation', { value: geolocation, configurable: true });
 });
 afterEach(() => {
@@ -94,10 +111,31 @@ describe('Dashboard map', () => {
         expect(bounds.points[0]).toEqual({ lat: 31, lng: -81 });
     });
 
-    it("colors a marker by its first tag and leaves untagged ones default", async () => {
+    it("colors a marker by its first tag with a darker border and white glyph, and leaves untagged ones default", async () => {
         renderDashboard([place(1, { tags: [tag, { ...tag, id: 2, color: '#000000' }] }), place(2)]);
         const pins = await screen.findAllByTestId('pin');
-        expect(pins.map(p => p.dataset.background)).toEqual(['#ff8800', '']);
+        expect(pins.map(p => ({ ...p.dataset }))).toEqual([
+            { testid: 'pin', background: '#ff8800', border: darken('#ff8800'), glyph: '#ffffff' },
+            { testid: 'pin', background: '', border: '', glyph: '' },
+        ]);
+    });
+
+    it("adds every marker to one clusterer that keeps the default zoom-to-cluster click", async () => {
+        renderDashboard([place(1), place(2)]);
+        const markers = await screen.findAllByTestId('marker');
+        expect(clusterers).toHaveLength(1);
+        expect(clusterers[0].options).toEqual({ map }); // no onClusterClick, so clicks fit the cluster's bounds
+        expect(clusterers[0].addMarker.mock.calls.map(([m]) => m)).toEqual(markers);
+    });
+
+    it("removes a dropped place's marker from the clusterer without re-adding the others", async () => {
+        let call = 0;
+        const { store, count } = renderDashboard(null, () => (++call === 1 ? [place(1), place(2)] : [place(1)]));
+        const [, second] = await screen.findAllByTestId('marker');
+        await refetchPlaces(store, count);
+        await vi.waitFor(() => expect(clusterers[0].removeMarker).toHaveBeenCalledWith(second));
+        expect(clusterers[0].removeMarker).toHaveBeenCalledOnce();
+        expect(clusterers[0].addMarker).toHaveBeenCalledTimes(2);
     });
 
     it("doesn't re-frame when a refetch changes only non-coordinate data, like a tag color", async () => {
@@ -413,9 +451,31 @@ describe('Place form tags', () => {
         await vi.waitFor(() => expect(calls.some(c => c.method === 'POST' && c.path === '/api/places')).toBe(true));
         const tagPost = calls.findIndex(c => c.method === 'POST' && c.path === '/api/tags');
         const placePost = calls.findIndex(c => c.method === 'POST' && c.path === '/api/places');
-        expect(calls[tagPost].body).toEqual({ tag: { name: 'Brunch' } });
+        expect(calls[tagPost].body).toEqual({ tag: { name: 'Brunch', color: TAG_PALETTE[0] } });
         expect(tagPost).toBeLessThan(placePost);
         expect(calls[placePost].body).toEqual({ place: expect.objectContaining({ tag_ids: [1, 3] }) });
+    });
+
+    it('gives new tags the least-used palette colors, one after another in a single save', async () => {
+        let nextId = 3;
+        const { calls, count } = renderDashboard([], undefined, {
+            'GET /api/tags': () => [
+                { ...tags[0], color: TAG_PALETTE[0] },
+                { ...tags[1], color: TAG_PALETTE[1].toUpperCase() },
+            ],
+            'POST /api/tags': (body) => ({ id: nextId++, ...(body as { tag: object }).tag, places_count: 0 }),
+            'POST /api/places': () => place(9),
+        });
+        await openAddForm();
+        addTag('Brunch');
+        addTag('Tacos');
+        save();
+
+        await vi.waitFor(() => expect(count('POST', '/api/places')).toBe(1));
+        expect(calls.filter(c => c.method === 'POST' && c.path === '/api/tags').map(c => c.body)).toEqual([
+            { tag: { name: 'Brunch', color: TAG_PALETTE[2] } },
+            { tag: { name: 'Tacos', color: TAG_PALETTE[3] } },
+        ]);
     });
 
     it('reuses an existing tag typed in a different case', async () => {
@@ -464,7 +524,7 @@ describe('Place form tags', () => {
 
         await vi.waitFor(() => expect(calls.find(c => c.method === 'PATCH')?.body).toEqual({ place: { tag_ids: [1, 3] } }));
         expect(count('POST', '/api/tags')).toBe(1);
-        expect(calls.find(c => c.method === 'POST')?.body).toEqual({ tag: { name: 'Brunch' } });
+        expect(calls.find(c => c.method === 'POST')?.body).toEqual({ tag: { name: 'Brunch', color: TAG_PALETTE[0] } });
     });
 
     it('reuses a tag it already created when retrying a failed save', async () => {

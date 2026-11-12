@@ -1,12 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppShell, Loader, Paper, Text } from "@mantine/core";
 import { AdvancedMarker, APIProvider, Map as GoogleMap, Pin, useMap } from "@vis.gl/react-google-maps";
+import { MarkerClusterer } from "@googlemaps/markerclusterer";
 import AppShellComponent from "./AppShell";
 import SideBar from "./SideBar";
 import PlaceDetail from "./PlaceDetail";
 import PlaceForm from "./PlaceForm";
 import { useGetPlacesQuery } from "../state/api/placeApi";
 import type { Place } from "../types/place";
+import { darken } from "../tagColors";
 
 const DEFAULT_CENTER = { lat: 33.7501, lng: -84.3885 }; // Atlanta
 const SINGLE_PLACE_ZOOM = 14;
@@ -56,6 +58,35 @@ const PanToPlace = ({ place }: { place: MappablePlace | undefined }) => {
     return null;
 };
 
+// Groups overlapping markers; clicking a cluster zooms to its bounds (the library default) until its places separate.
+const useClusterer = () => {
+    const map = useMap();
+    const clusterer = useMemo(() => (map ? new MarkerClusterer({ map }) : null), [map]);
+    useEffect(() => () => clusterer?.setMap(null), [clusterer]);
+    return clusterer;
+};
+
+const PlaceMarker = ({ place, clusterer, onSelect }: { place: MappablePlace; clusterer: MarkerClusterer | null; onSelect: (id: number) => void }) => {
+    // Stable per clusterer, so re-renders don't remove and re-add the marker.
+    const register = useCallback((marker: google.maps.marker.AdvancedMarkerElement | null) => {
+        if (!marker || !clusterer) return;
+        clusterer.addMarker(marker);
+        return () => { clusterer.removeMarker(marker); };
+    }, [clusterer]);
+    const color = place.tags[0]?.color;
+    return (
+        <AdvancedMarker ref={register} position={{ lat: place.lat, lng: place.lng }} title={place.title} onClick={() => onSelect(place.id)}>
+            {/* A darker border keeps light tag colors visible against the map. */}
+            <Pin background={color} borderColor={color && darken(color)} glyphColor={color && "#ffffff"} />
+        </AdvancedMarker>
+    );
+};
+
+const ClusteredMarkers = ({ places, onSelect }: { places: MappablePlace[]; onSelect: (id: number) => void }) => {
+    const clusterer = useClusterer();
+    return places.map(place => <PlaceMarker key={place.id} place={place} clusterer={clusterer} onSelect={onSelect} />);
+};
+
 const MapOverlay = ({ children, alert = false }: { children: React.ReactNode; alert?: boolean }) => (
     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
         <Paper shadow="md" p="md" radius="md" className="pointer-events-auto text-center" role={alert ? "alert" : undefined}>
@@ -88,15 +119,7 @@ const Dashboard = () => {
                 <div className="relative w-full h-[calc(100vh-60px)]">
                     <APIProvider apiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}>
                         <GoogleMap mapId={MAP_ID} defaultCenter={DEFAULT_CENTER} defaultZoom={12} gestureHandling="greedy">
-                            {mappable.map(place => {
-                                const color = place.tags[0]?.color;
-                                return (
-                                    <AdvancedMarker key={place.id} position={{ lat: place.lat, lng: place.lng }} title={place.title}
-                                        onClick={() => setSelectedId(place.id)}>
-                                        <Pin background={color} borderColor={color} glyphColor={color && "#ffffff"} />
-                                    </AdvancedMarker>
-                                );
-                            })}
+                            <ClusteredMarkers places={mappable} onSelect={setSelectedId} />
                         </GoogleMap>
                         {isSuccess && <FitToPlaces places={mappable} />}
                         <PanToPlace place={selectedPlace} />

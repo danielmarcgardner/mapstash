@@ -9,6 +9,7 @@ import { useCreateTagMutation, useGetTagsQuery } from "../state/api/tagApi";
 import { useGetListsQuery } from "../state/api/listApi";
 import { errorMessage } from "../state/api/errorMessage";
 import type { CreatePlacePayload, Place } from "../types/place";
+import { nextTagColor } from "../tagColors";
 
 type Props = { place?: Place; onClose: () => void; onSaved: (place: Place) => void };
 
@@ -102,16 +103,19 @@ const PlaceForm = ({ place, onClose, onSaved }: Props) => {
     };
 
     // Typed names that match no tag (case-insensitive, like the server's uniqueness rule) are created on save,
-    // so cancelling before saving leaves no orphan tags. New tags get the server's default color.
+    // so cancelling before saving leaves no orphan tags. New tags get the least-used palette color, so their pins stand out.
     const resolveTagIds = async (names: string[]) => {
         // The place's own tags count as known even if the tags list hasn't loaded.
         const known = [...tags, ...(place?.tags ?? [])];
+        const usedColors = [...new Map(known.map(t => [t.id, t.color])).values()]; // the place's tags are also in `tags`
         const ids: number[] = [];
         for (const name of names) {
             const key = name.trim().toLowerCase();
             let id = known.find(t => t.name.toLowerCase() === key)?.id ?? createdTags.current.get(key);
             if (id === undefined) {
-                id = (await createTag({ name: name.trim() }).unwrap()).id;
+                const color = nextTagColor(usedColors);
+                id = (await createTag({ name: name.trim(), color }).unwrap()).id;
+                usedColors.push(color);
                 createdTags.current.set(key, id);
             }
             ids.push(id);
