@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import { Alert, Button, Group, Modal, MultiSelect, Select, Stack, TagsInput, TextInput, Textarea, useMantineTheme } from "@mantine/core";
+import { Alert, Button, Group, Modal, MultiSelect, Select, Stack, TagsInput, TextInput, Textarea } from "@mantine/core";
 import { useForm } from "@mantine/form";
-import { useDebouncedValue, useMediaQuery } from "@mantine/hooks";
+import { useDebouncedValue } from "@mantine/hooks";
 import { notifications } from "@mantine/notifications";
 import { useMapsLibrary } from "@vis.gl/react-google-maps";
 import { useCreatePlaceMutation, useUpdatePlaceMutation } from "../state/api/placeApi";
 import { useCreateTagMutation, useGetTagsQuery } from "../state/api/tagApi";
 import { useGetListsQuery } from "../state/api/listApi";
 import { errorMessage } from "../state/api/errorMessage";
+import { useIsPhone } from "../hooks/useIsPhone";
 import type { CreatePlacePayload, Place } from "../types/place";
 
 type Props = { place?: Place; onClose: () => void; onSaved: (place: Place) => void };
@@ -23,7 +24,7 @@ const isHttpUrl = (value: string) => {
 
 const PlaceForm = ({ place, onClose, onSaved }: Props) => {
     const placesLib = useMapsLibrary("places");
-    const isPhone = useMediaQuery(`(max-width: ${useMantineTheme().breakpoints.sm})`);
+    const isPhone = useIsPhone();
     const [createPlace, createStatus] = useCreatePlaceMutation();
     const [updatePlace, updateStatus] = useUpdatePlaceMutation();
     const { data: tags = [] } = useGetTagsQuery();

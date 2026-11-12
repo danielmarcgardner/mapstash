@@ -1,15 +1,15 @@
 import { useState } from "react";
-import { Alert, Badge, Button, Drawer, Group, Stack, Text, useMantineTheme } from "@mantine/core";
-import { useMediaQuery } from "@mantine/hooks";
+import { Alert, Badge, Button, Drawer, Group, Stack, Text } from "@mantine/core";
 import { useDeletePlaceMutation } from "../state/api/placeApi";
 import { useGetListsQuery } from "../state/api/listApi";
+import { useIsPhone } from "../hooks/useIsPhone";
 import type { Place } from "../types/place";
 
 type Props = { place: Place | undefined; onClose: () => void; onEdit: () => void };
 
 const PlaceDetail = ({ place, onClose, onEdit }: Props) => {
     const { data: lists = [] } = useGetListsQuery();
-    const isPhone = useMediaQuery(`(max-width: ${useMantineTheme().breakpoints.sm})`);
+    const isPhone = useIsPhone();
     const [deletePlace, { isLoading: deleting }] = useDeletePlaceMutation();
     const [confirming, setConfirming] = useState(false);
     const [error, setError] = useState(false);

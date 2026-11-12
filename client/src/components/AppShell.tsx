@@ -1,11 +1,10 @@
 import { AppShell } from "@mantine/core";
-import { useDisclosure } from "@mantine/hooks";
 import Header from "./Header";
 import type { ReactNode } from "react";
 
-const AppShellComponent = ({ children, onAddPlace }: { children: ReactNode; onAddPlace: () => void }) => {
-    const [navOpened, { toggle }] = useDisclosure();
+type Props = { children: ReactNode; onAddPlace: () => void; navOpened: boolean; onToggleNav: () => void };
 
+const AppShellComponent = ({ children, onAddPlace, navOpened, onToggleNav }: Props) => {
     return (
         <AppShell
             header={{
@@ -18,7 +17,7 @@ const AppShellComponent = ({ children, onAddPlace }: { children: ReactNode; onAd
             }}
             padding="md"
             >
-            <Header onAddPlace={onAddPlace} navOpened={navOpened} onToggleNav={toggle} />
+            <Header onAddPlace={onAddPlace} navOpened={navOpened} onToggleNav={onToggleNav} />
             {children}
         </AppShell>
     );
