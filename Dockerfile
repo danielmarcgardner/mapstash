@@ -5,6 +5,8 @@ WORKDIR /client
 COPY client/package*.json ./
 RUN npm install
 COPY client .
+# Passed from Kamal's builder args; Vite reads it from the environment at build time.
+ARG VITE_SENTRY_DSN
 RUN npm run build
 # Removed the erroneous COPY referencing a non-existent builder
 
