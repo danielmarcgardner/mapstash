@@ -61,8 +61,13 @@ const PanToPlace = ({ place }: { place: MappablePlace | undefined }) => {
 // Groups overlapping markers; clicking a cluster zooms to its bounds (the library default) until its places separate.
 const useClusterer = () => {
     const map = useMap();
-    const clusterer = useMemo(() => (map ? new MarkerClusterer({ map }) : null), [map]);
-    useEffect(() => () => clusterer?.setMap(null), [clusterer]);
+    const clusterer = useMemo(() => (map ? new MarkerClusterer({}) : null), [map]);
+    // Attached here, not in useMemo, so StrictMode's cleanup-then-rerun re-attaches it.
+    useEffect(() => {
+        if (!map || !clusterer) return;
+        clusterer.setMap(map);
+        return () => clusterer.setMap(null);
+    }, [map, clusterer]);
     return clusterer;
 };
 

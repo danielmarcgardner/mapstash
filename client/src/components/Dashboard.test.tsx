@@ -1,5 +1,5 @@
 import { fireEvent, screen, within } from '@testing-library/react';
-import type { ReactNode } from 'react';
+import { StrictMode, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Dashboard from './Dashboard';
 import { jsonResponse, stubFetch, type Route } from '../test/fetchStub';
@@ -62,7 +62,7 @@ const lists = [
     { id: 8, title: 'Brunch', description: null, places_count: 0, place_ids: [] },
 ];
 
-const renderDashboard = (places: unknown, placesRoute: Route = () => places, extraRoutes: Parameters<typeof stubFetch>[0] = {}) => {
+const renderDashboard = (places: unknown, placesRoute: Route = () => places, extraRoutes: Parameters<typeof stubFetch>[0] = {}, ui: ReactNode = <Dashboard />) => {
     const { calls, count } = stubFetch({
         'GET /api/places': placesRoute,
         'GET /api/tags': () => [],
@@ -70,7 +70,7 @@ const renderDashboard = (places: unknown, placesRoute: Route = () => places, ext
         'GET /api/users/me': () => ({ id: 1, email: 'a@b.co', first_name: 'A', last_name: 'B' }),
         ...extraRoutes,
     });
-    const store = renderWithStore(<Dashboard />);
+    const store = renderWithStore(ui);
     return { store, calls, count };
 };
 
@@ -124,8 +124,17 @@ describe('Dashboard map', () => {
         renderDashboard([place(1), place(2)]);
         const markers = await screen.findAllByTestId('marker');
         expect(clusterers).toHaveLength(1);
-        expect(clusterers[0].options).toEqual({ map }); // no onClusterClick, so clicks fit the cluster's bounds
+        expect(clusterers[0].options).toEqual({}); // no onClusterClick, so clicks fit the cluster's bounds
+        expect(clusterers[0].setMap.mock.calls).toEqual([[map]]);
         expect(clusterers[0].addMarker.mock.calls.map(([m]) => m)).toEqual(markers);
+    });
+
+    it("keeps the clusterer on the map under StrictMode's effect re-run", async () => {
+        renderDashboard([place(1), place(2)], undefined, {}, <StrictMode><Dashboard /></StrictMode>);
+        await screen.findAllByTestId('marker');
+        const used = clusterers.filter(c => c.addMarker.mock.calls.length > 0);
+        expect(used).toHaveLength(1);
+        expect(used[0].setMap).toHaveBeenLastCalledWith(map);
     });
 
     it("removes a dropped place's marker from the clusterer without re-adding the others", async () => {
