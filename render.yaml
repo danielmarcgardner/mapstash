@@ -1,0 +1,32 @@
+# Render Blueprint: one Docker web service and its Postgres database.
+# Secrets marked `sync: false` are entered in the Render dashboard on first sync.
+# Also add a secret file named `sentry_auth_token` (a Sentry auth token) so the build uploads source maps.
+services:
+  - type: web
+    name: mapstash
+    runtime: docker
+    plan: 0.5c-512mb
+    healthCheckPath: /up
+    preDeployCommand: bin/rails db:prepare
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mapstash-db
+          property: connectionString
+      - key: RAILS_MASTER_KEY
+        sync: false
+      - key: JWT_SECRET_KEY
+        sync: false
+      - key: VITE_GOOGLE_MAPS_API_KEY
+        sync: false
+      - key: VITE_GOOGLE_MAPS_MAP_ID
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
+      - key: VITE_SENTRY_DSN
+        sync: false
+
+databases:
+  - name: mapstash-db
+    plan: 0.1c-256mb

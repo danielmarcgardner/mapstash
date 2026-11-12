@@ -3,6 +3,7 @@ Sentry.init do |config|
   config.dsn = ENV["SENTRY_DSN"]
   # The test container loads .env too, so keep specs from reporting.
   config.enabled_environments = %w[development production]
+  config.release = ENV["RENDER_GIT_COMMIT"] # set by Render
   config.breadcrumbs_logger = [ :active_support_logger, :http_logger ]
   # Every trace locally so they show up while developing; a sample in production.
   config.traces_sample_rate = Rails.env.production? ? 0.1 : 1.0
