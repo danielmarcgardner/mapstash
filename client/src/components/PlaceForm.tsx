@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { Alert, Button, Group, Modal, Select, Stack, TagsInput, TextInput, Textarea } from "@mantine/core";
+import { Alert, Button, Group, Modal, MultiSelect, Select, Stack, TagsInput, TextInput, Textarea } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { useDebouncedValue } from "@mantine/hooks";
 import { notifications } from "@mantine/notifications";
 import { useMapsLibrary } from "@vis.gl/react-google-maps";
 import { useCreatePlaceMutation, useUpdatePlaceMutation } from "../state/api/placeApi";
 import { useCreateTagMutation, useGetTagsQuery } from "../state/api/tagApi";
+import { useGetListsQuery } from "../state/api/listApi";
 import type { CreatePlacePayload, Place } from "../types/place";
 import type { AuthError } from "../types/user";
 
@@ -25,6 +26,7 @@ const PlaceForm = ({ place, onClose, onSaved }: Props) => {
     const [createPlace, createStatus] = useCreatePlaceMutation();
     const [updatePlace, updateStatus] = useUpdatePlaceMutation();
     const { data: tags = [] } = useGetTagsQuery();
+    const { data: lists = [] } = useGetListsQuery();
     const [createTag, createTagStatus] = useCreateTagMutation();
     const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -49,6 +51,7 @@ const PlaceForm = ({ place, onClose, onSaved }: Props) => {
             lng: place?.lng ?? null as number | null,
             google_place_id: place?.google_place_id ?? "",
             tags: place?.tags.map(t => t.name) ?? [],
+            list_ids: place?.list_ids.map(String) ?? [], // MultiSelect values are strings
         },
         validate: {
             title: (value) => (value.trim() ? null : "Title is required"),
@@ -119,12 +122,13 @@ const PlaceForm = ({ place, onClose, onSaved }: Props) => {
     const handleSubmit = async (values: typeof form.values) => {
         setSubmitError(null);
         // Edits send only changed fields, so display-only values (like a missing address's placeholder) aren't saved back.
-        const { tags: tagNames, ...fieldValues } = values;
+        const { tags: tagNames, list_ids: listIds, ...fieldValues } = values;
         const fields = Object.entries(fieldValues).filter(([key]) => !place || form.isDirty(key));
         // Blank optional fields are stored as null, not "". Built per key, so TS can't see the shape:
         // title and lat/lng are guaranteed by validation, and the API accepts null for the rest.
         const payload = Object.fromEntries(fields.map(([key, value]) => [key, value === "" ? null : value])) as unknown as CreatePlacePayload;
         try {
+            if (!place || form.isDirty("list_ids")) payload.list_ids = listIds.map(Number);
             if (!place || form.isDirty("tags")) payload.tag_ids = await resolveTagIds(tagNames);
             const saved = place
                 ? await updatePlace({ id: place.id, ...payload }).unwrap()
@@ -161,6 +165,14 @@ const PlaceForm = ({ place, onClose, onSaved }: Props) => {
                         data={tags.map(t => t.name)}
                         clearable
                         {...form.getInputProps("tags")}
+                    />
+                    <MultiSelect
+                        label="Lists"
+                        placeholder="Add to lists"
+                        data={lists.map(l => ({ value: String(l.id), label: l.title }))}
+                        searchable
+                        clearable
+                        {...form.getInputProps("list_ids")}
                     />
                     <TextInput label="Link" placeholder="https://www.instagram.com/reel/…" {...form.getInputProps("link_url")} />
                     <Textarea label="Description" autosize minRows={2} {...form.getInputProps("description")} />
