@@ -54,7 +54,7 @@ const ListEditor = ({ list, onClose, onDeleted }: Props) => {
                         ) : (
                             <Button color="red" variant="subtle" onClick={() => setConfirming(true)}>Delete</Button>
                         ))}
-                        <Button type="submit" loading={creating || updating}>Save</Button>
+                        <Button type="submit" loading={creating || updating} disabled={deleting}>Save</Button>
                     </Group>
                 </Stack>
             </form>

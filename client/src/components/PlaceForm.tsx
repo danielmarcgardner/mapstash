@@ -7,8 +7,8 @@ import { useMapsLibrary } from "@vis.gl/react-google-maps";
 import { useCreatePlaceMutation, useUpdatePlaceMutation } from "../state/api/placeApi";
 import { useCreateTagMutation, useGetTagsQuery } from "../state/api/tagApi";
 import { useGetListsQuery } from "../state/api/listApi";
+import { errorMessage } from "../state/api/errorMessage";
 import type { CreatePlacePayload, Place } from "../types/place";
-import type { AuthError } from "../types/user";
 
 type Props = { place?: Place; onClose: () => void; onSaved: (place: Place) => void };
 
@@ -136,7 +136,7 @@ const PlaceForm = ({ place, onClose, onSaved }: Props) => {
             notifications.show({ message: "Place saved", color: "green" });
             onSaved(saved);
         } catch (err) {
-            setSubmitError((err as { data?: AuthError })?.data?.errors?.join(" ") || "Couldn't save the place.");
+            setSubmitError(errorMessage(err, "Couldn't save the place."));
         }
     };
 
