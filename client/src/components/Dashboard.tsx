@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppShell, Loader, Paper, Text } from "@mantine/core";
+import { useDisclosure } from "@mantine/hooks";
 import { AdvancedMarker, APIProvider, Map as GoogleMap, Pin, useMap } from "@vis.gl/react-google-maps";
 import { MarkerClusterer } from "@googlemaps/markerclusterer";
 import AppShellComponent from "./AppShell";
@@ -115,10 +116,12 @@ const Dashboard = () => {
     // Derived from query data, so a deleted place deselects itself after the refetch.
     const selectedPlace = mappable.find(p => p.id === selectedId);
     const [formPlace, setFormPlace] = useState<Place | "new" | null>(null);
+    // On a phone the navbar covers the map, so close it once a choice should show on the map.
+    const [navOpened, nav] = useDisclosure();
 
     return (
-        <AppShellComponent onAddPlace={() => setFormPlace("new")}>
-            <SideBar tagFilter={tagFilter} onTagFilterChange={setTagFilter} listFilter={listFilter} onListFilterChange={setListFilter} />
+        <AppShellComponent onAddPlace={() => setFormPlace("new")} navOpened={navOpened} onToggleNav={nav.toggle}>
+            <SideBar tagFilter={tagFilter} onTagFilterChange={setTagFilter} listFilter={listFilter} onListFilterChange={id => { setListFilter(id); nav.close(); }} />
 
             <AppShell.Main className="p-0">
                 <div className="relative w-full h-[calc(100vh-60px)]">
@@ -133,7 +136,7 @@ const Dashboard = () => {
                                 key={formPlace === "new" ? "new" : formPlace.id}
                                 place={formPlace === "new" ? undefined : formPlace}
                                 onClose={() => setFormPlace(null)}
-                                onSaved={saved => { setFormPlace(null); setSelectedId(saved.id); }}
+                                onSaved={saved => { setFormPlace(null); setSelectedId(saved.id); nav.close(); }}
                             />
                         )}
                     </APIProvider>

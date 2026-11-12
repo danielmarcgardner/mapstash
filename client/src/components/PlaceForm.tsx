@@ -8,6 +8,7 @@ import { useCreatePlaceMutation, useUpdatePlaceMutation } from "../state/api/pla
 import { useCreateTagMutation, useGetTagsQuery } from "../state/api/tagApi";
 import { useGetListsQuery } from "../state/api/listApi";
 import { errorMessage } from "../state/api/errorMessage";
+import { useIsPhone } from "../hooks/useIsPhone";
 import type { CreatePlacePayload, Place } from "../types/place";
 import { nextTagColor } from "../tagColors";
 
@@ -24,6 +25,7 @@ const isHttpUrl = (value: string) => {
 
 const PlaceForm = ({ place, onClose, onSaved }: Props) => {
     const placesLib = useMapsLibrary("places");
+    const isPhone = useIsPhone();
     const [createPlace, createStatus] = useCreatePlaceMutation();
     const [updatePlace, updateStatus] = useUpdatePlaceMutation();
     const { data: tags = [] } = useGetTagsQuery();
@@ -145,7 +147,7 @@ const PlaceForm = ({ place, onClose, onSaved }: Props) => {
     };
 
     return (
-        <Modal opened onClose={onClose} title={place ? "Edit place" : "Add place"}>
+        <Modal opened onClose={onClose} fullScreen={isPhone} title={place ? "Edit place" : "Add place"}>
             <form onSubmit={form.onSubmit(handleSubmit)}>
                 <Stack gap="sm">
                     <Select

@@ -2,7 +2,9 @@ import { AppShell } from "@mantine/core";
 import Header from "./Header";
 import type { ReactNode } from "react";
 
-const AppShellComponent = ({ children, onAddPlace }: { children: ReactNode; onAddPlace: () => void }) => {
+type Props = { children: ReactNode; onAddPlace: () => void; navOpened: boolean; onToggleNav: () => void };
+
+const AppShellComponent = ({ children, onAddPlace, navOpened, onToggleNav }: Props) => {
     return (
         <AppShell
             header={{
@@ -11,10 +13,11 @@ const AppShellComponent = ({ children, onAddPlace }: { children: ReactNode; onAd
             navbar={{
                 width: 250,
                 breakpoint: "sm",
+                collapsed: { mobile: !navOpened },
             }}
             padding="md"
             >
-            <Header onAddPlace={onAddPlace} />
+            <Header onAddPlace={onAddPlace} navOpened={navOpened} onToggleNav={onToggleNav} />
             {children}
         </AppShell>
     );

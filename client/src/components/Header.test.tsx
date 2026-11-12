@@ -9,10 +9,13 @@ import { renderWithStore } from '../test/renderWithStore';
 
 const user = { id: 1, email: 'a@b.co', first_name: 'ada', last_name: 'lovelace' };
 
-const renderHeader = (onAddPlace = vi.fn()) => {
+const renderHeader = (onAddPlace = vi.fn(), { navOpened = false, onToggleNav = vi.fn() } = {}) => {
     const store = makeStore();
     store.dispatch(loginSuccess({ user, token: 'abc' }));
-    renderWithStore(<AppShell header={{ height: 60 }}><Header onAddPlace={onAddPlace} /></AppShell>, store);
+    renderWithStore(
+        <AppShell header={{ height: 60 }}><Header onAddPlace={onAddPlace} navOpened={navOpened} onToggleNav={onToggleNav} /></AppShell>,
+        store,
+    );
     return store;
 };
 
@@ -66,5 +69,21 @@ describe('Header', () => {
         renderHeader(onAddPlace);
         fireEvent.click(await screen.findByRole('button', { name: 'Add place' }));
         expect(onAddPlace).toHaveBeenCalledOnce();
+    });
+
+    it('shows the burger as expanded when the navigation is open', async () => {
+        stubFetch({ 'GET /api/users/me': () => user });
+        renderHeader(vi.fn(), { navOpened: true });
+        expect(await screen.findByRole('button', { name: 'Toggle navigation' })).toHaveAttribute('aria-expanded', 'true');
+    });
+
+    it('toggles the navigation from the burger', async () => {
+        stubFetch({ 'GET /api/users/me': () => user });
+        const onToggleNav = vi.fn();
+        renderHeader(vi.fn(), { onToggleNav });
+        const burger = await screen.findByRole('button', { name: 'Toggle navigation' });
+        expect(burger).toHaveAttribute('aria-expanded', 'false');
+        fireEvent.click(burger);
+        expect(onToggleNav).toHaveBeenCalledOnce();
     });
 });

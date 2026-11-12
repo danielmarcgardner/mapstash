@@ -1,4 +1,4 @@
-import { AppShell, Group, Avatar, Button, Input, Menu, Title, UnstyledButton } from "@mantine/core";
+import { AppShell, Group, Avatar, Burger, Button, Input, Menu, Title, UnstyledButton } from "@mantine/core";
 import { IconLogout, IconPlus, IconSearch } from "@tabler/icons-react";
 import { useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
@@ -6,7 +6,9 @@ import { useGetCurrentUserQuery, useLogoutMutation } from '../state/api/authApi'
 import { endSession } from '../state/api/baseApi';
 import { LOGIN } from '../constants/routes';
 
-const Header = ({ onAddPlace }: { onAddPlace: () => void }) => {
+type Props = { onAddPlace: () => void; navOpened: boolean; onToggleNav: () => void };
+
+const Header = ({ onAddPlace, navOpened, onToggleNav }: Props) => {
     const { data: currentUser } = useGetCurrentUserQuery();
     const [logout] = useLogoutMutation();
     const dispatch = useDispatch();
@@ -30,13 +32,18 @@ const Header = ({ onAddPlace }: { onAddPlace: () => void }) => {
 
     return (
     <AppShell.Header className="flex items-center justify-between px-4 border-b border-gray-200 bg-white">
-        <Title order={3}>MapStash</Title>
-        <Group gap="sm">
+        <Group gap="xs" wrap="nowrap">
+            <Burger opened={navOpened} onClick={onToggleNav} hiddenFrom="sm" size="sm"
+                aria-label="Toggle navigation" aria-expanded={navOpened} />
+            <Title order={3}>MapStash</Title>
+        </Group>
+        <Group gap="sm" wrap="nowrap">
             <Button leftSection={<IconPlus size={16} />} onClick={onAddPlace}>Add place</Button>
             <Input
                 leftSection={<IconSearch size={16} />}
                 placeholder="Search places"
                 className="w-64"
+                visibleFrom="sm"
                 disabled={true}
             />
             <Menu position="bottom-end">

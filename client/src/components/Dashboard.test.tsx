@@ -857,3 +857,66 @@ describe('List filter and management', () => {
         await vi.waitFor(() => expect(screen.getAllByTestId('marker')).toHaveLength(3));
     });
 });
+
+describe('Phone layout', () => {
+    const desktopMatchMedia = window.matchMedia;
+    // Mantine's useMediaQuery reads matchMedia; matching every max-width query puts us below the sm breakpoint.
+    const usePhoneWidth = () => {
+        window.matchMedia = (query: string) => ({ ...desktopMatchMedia(query), matches: query.includes('max-width') });
+    };
+    afterEach(() => { window.matchMedia = desktopMatchMedia; });
+
+    it('opens and closes the navigation from the burger', async () => {
+        renderDashboard([]);
+        const burger = await screen.findByRole('button', { name: 'Toggle navigation' });
+        expect(burger).toHaveAttribute('aria-expanded', 'false');
+        fireEvent.click(burger);
+        expect(burger).toHaveAttribute('aria-expanded', 'true');
+        fireEvent.click(burger);
+        expect(burger).toHaveAttribute('aria-expanded', 'false');
+    });
+
+    it('closes the navigation after picking a list, but not a tag', async () => {
+        renderDashboard([place(1)], undefined, { 'GET /api/tags': () => [{ ...tag, places_count: 0 }] });
+        const burger = await screen.findByRole('button', { name: 'Toggle navigation' });
+        fireEvent.click(burger);
+
+        fireEvent.click(await screen.findByRole('button', { name: /^Coffee\b/ }));
+        expect(burger).toHaveAttribute('aria-expanded', 'true'); // tags are multi-select, so stay open
+
+        fireEvent.click(await screen.findByRole('button', { name: 'Brunch 0' }));
+        expect(burger).toHaveAttribute('aria-expanded', 'false');
+    });
+
+    it('closes the navigation after saving a place', async () => {
+        renderDashboard([place(1)], undefined, { 'PATCH /api/places/1': () => place(1, { notes: 'New' }) });
+        const burger = await screen.findByRole('button', { name: 'Toggle navigation' });
+        fireEvent.click(burger);
+        fireEvent.click(await screen.findByTestId('marker'));
+        fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+        fireEvent.change(await screen.findByLabelText('Notes'), { target: { value: 'New' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+        await vi.waitFor(() => expect(burger).toHaveAttribute('aria-expanded', 'false'));
+    });
+
+    it('opens the place form full screen on a phone', async () => {
+        usePhoneWidth();
+        renderDashboard([]);
+        fireEvent.click(await screen.findByRole('button', { name: 'Add place' }));
+        expect(await screen.findByRole('dialog')).toHaveAttribute('data-full-screen');
+    });
+
+    it("doesn't open the place form full screen on a desktop", async () => {
+        renderDashboard([]);
+        fireEvent.click(await screen.findByRole('button', { name: 'Add place' }));
+        expect(await screen.findByRole('dialog')).not.toHaveAttribute('data-full-screen');
+    });
+
+    it('opens the place details at full width on a phone', async () => {
+        usePhoneWidth();
+        renderDashboard([place(1)]);
+        fireEvent.click(await screen.findByTestId('marker'));
+        const drawer = await screen.findByRole('dialog');
+        expect(drawer.closest('.mantine-Drawer-root')).toHaveStyle({ '--drawer-size': '100%' });
+    });
+});
