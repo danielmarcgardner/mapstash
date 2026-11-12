@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Alert, Button, Group, Modal, MultiSelect, Select, Stack, TagsInput, TextInput, Textarea } from "@mantine/core";
+import { Alert, Button, Group, Modal, MultiSelect, Select, Stack, TagsInput, TextInput, Textarea, useMantineTheme } from "@mantine/core";
 import { useForm } from "@mantine/form";
-import { useDebouncedValue } from "@mantine/hooks";
+import { useDebouncedValue, useMediaQuery } from "@mantine/hooks";
 import { notifications } from "@mantine/notifications";
 import { useMapsLibrary } from "@vis.gl/react-google-maps";
 import { useCreatePlaceMutation, useUpdatePlaceMutation } from "../state/api/placeApi";
@@ -23,6 +23,7 @@ const isHttpUrl = (value: string) => {
 
 const PlaceForm = ({ place, onClose, onSaved }: Props) => {
     const placesLib = useMapsLibrary("places");
+    const isPhone = useMediaQuery(`(max-width: ${useMantineTheme().breakpoints.sm})`);
     const [createPlace, createStatus] = useCreatePlaceMutation();
     const [updatePlace, updateStatus] = useUpdatePlaceMutation();
     const { data: tags = [] } = useGetTagsQuery();
@@ -141,7 +142,7 @@ const PlaceForm = ({ place, onClose, onSaved }: Props) => {
     };
 
     return (
-        <Modal opened onClose={onClose} title={place ? "Edit place" : "Add place"}>
+        <Modal opened onClose={onClose} fullScreen={isPhone} title={place ? "Edit place" : "Add place"}>
             <form onSubmit={form.onSubmit(handleSubmit)}>
                 <Stack gap="sm">
                     <Select

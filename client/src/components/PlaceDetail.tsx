@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Alert, Badge, Button, Drawer, Group, Stack, Text } from "@mantine/core";
+import { Alert, Badge, Button, Drawer, Group, Stack, Text, useMantineTheme } from "@mantine/core";
+import { useMediaQuery } from "@mantine/hooks";
 import { useDeletePlaceMutation } from "../state/api/placeApi";
 import { useGetListsQuery } from "../state/api/listApi";
 import type { Place } from "../types/place";
@@ -8,6 +9,7 @@ type Props = { place: Place | undefined; onClose: () => void; onEdit: () => void
 
 const PlaceDetail = ({ place, onClose, onEdit }: Props) => {
     const { data: lists = [] } = useGetListsQuery();
+    const isPhone = useMediaQuery(`(max-width: ${useMantineTheme().breakpoints.sm})`);
     const [deletePlace, { isLoading: deleting }] = useDeletePlaceMutation();
     const [confirming, setConfirming] = useState(false);
     const [error, setError] = useState(false);
@@ -38,7 +40,7 @@ const PlaceDetail = ({ place, onClose, onEdit }: Props) => {
     const placeLists = lists.filter(list => shown?.list_ids.includes(list.id));
 
     return (
-        <Drawer opened={!!place} onClose={onClose} position="right" title={<Text fw={600}>{shown?.title}</Text>}>
+        <Drawer opened={!!place} onClose={onClose} position="right" size={isPhone ? "100%" : undefined} title={<Text fw={600}>{shown?.title}</Text>}>
             {shown && (
                 <Stack gap="sm">
                     <Text size="sm" c="dimmed">{shown.address}</Text>
