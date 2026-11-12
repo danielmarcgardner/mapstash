@@ -126,7 +126,7 @@ Errors, traces and logs go to the `mapstash-server` (Rails) and `mapstash-fronte
 2. Find the last good deploy and click **Rollback**, then **Rollback to this deploy**. Render reuses that deploy's image and env vars, so there's no rebuild.
 3. **Rolling back from the dashboard turns auto-deploy off.** Once `main` is fixed, turn it back on under **Settings**, or new pushes won't deploy.
 
-A rollback doesn't undo database migrations or env var changes made since. Keep migrations backward-compatible: add columns and tables first, and remove them in a later deploy. That way the previous release can still run against the new schema.
+A rollback brings back that deploy's env vars too, so after rolling back, re-check any secret you've rotated since (e.g. a leaked `JWT_SECRET_KEY`) and set it again. It doesn't undo database migrations. Keep migrations backward-compatible: add columns and tables first, and remove them in a later deploy. That way the previous release can still run against the new schema.
 
 ## Smoke test
 
