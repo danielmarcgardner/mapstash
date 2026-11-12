@@ -1,17 +1,25 @@
 import { useState } from "react";
 import { ActionIcon, AppShell, Button, Group, ScrollArea, Title } from "@mantine/core";
-import { IconPencil } from "@tabler/icons-react";
+import { IconPencil, IconPlus } from "@tabler/icons-react";
+import ListEditor from "./ListEditor";
 import TagEditor from "./TagEditor";
+import type { List } from "../types/list";
 import type { Tag } from "../types/tag";
 import { useGetListsQuery } from "../state/api/listApi";
 import { useGetTagsQuery } from "../state/api/tagApi";
 
 const LOAD_ERROR = 'Something went wrong. Please try again later.';
 
-type Props = { tagFilter: number[]; onTagFilterChange: (ids: number[]) => void };
+type Props = {
+    tagFilter: number[];
+    onTagFilterChange: (ids: number[]) => void;
+    listFilter: number | null;
+    onListFilterChange: (id: number | null) => void;
+};
 
-const SideBar = ({ tagFilter, onTagFilterChange }: Props) => {
+const SideBar = ({ tagFilter, onTagFilterChange, listFilter, onListFilterChange }: Props) => {
     const [editing, setEditing] = useState<Tag | null>(null);
+    const [editingList, setEditingList] = useState<List | "new" | null>(null);
     const toggle = (id: number) =>
         onTagFilterChange(tagFilter.includes(id) ? tagFilter.filter(t => t !== id) : [...tagFilter, id]);
 
@@ -21,16 +29,30 @@ const SideBar = ({ tagFilter, onTagFilterChange }: Props) => {
     return (
         <AppShell.Navbar p="xs">
             <ScrollArea className="h-full">
-                <Title order={5} mb="xs">
-                    Your Lists
-                </Title>
-                <ul className="mb-4 space-y-2">
+                <Group justify="space-between" mb="xs">
+                    <Title order={5}>Your Lists</Title>
+                    <ActionIcon size="sm" variant="subtle" color="gray" aria-label="New list" onClick={() => setEditingList("new")}>
+                        <IconPlus size={14} />
+                    </ActionIcon>
+                </Group>
+                <ul className="mb-4 space-y-1">
                     {listsLoading && <li className="text-sm text-gray-500">Loading…</li>}
                     {listsError && <li role="alert" className="text-sm text-red-600">{LOAD_ERROR}</li>}
                     {!listsLoading && !listsError && lists.length === 0 && <li className="text-sm text-gray-500">No lists yet</li>}
-                    {lists.map(list => (
-                        <li key={list.id} className="text-sm text-gray-700 hover:text-black cursor-pointer">{list.title}</li>
-                    ))}
+                    {lists.map(list => {
+                        const selected = listFilter === list.id;
+                        return (
+                            <li key={list.id} className="flex items-center justify-between gap-1">
+                                <button type="button" aria-pressed={selected} onClick={() => onListFilterChange(selected ? null : list.id)}
+                                    className={`flex-1 text-left text-sm cursor-pointer rounded px-1 ${selected ? "font-semibold text-black bg-gray-100" : "text-gray-700 hover:text-black"}`}>
+                                    {list.title} <span className="opacity-70">{list.places_count}</span>
+                                </button>
+                                <ActionIcon size="xs" variant="subtle" color="gray" aria-label={`Edit ${list.title}`} onClick={() => setEditingList(list)}>
+                                    <IconPencil size={12} />
+                                </ActionIcon>
+                            </li>
+                        );
+                    })}
                 </ul>
 
                 <Group justify="space-between" mb="xs">
@@ -65,6 +87,14 @@ const SideBar = ({ tagFilter, onTagFilterChange }: Props) => {
                     tag={editing}
                     onClose={() => setEditing(null)}
                     onDeleted={id => onTagFilterChange(tagFilter.filter(t => t !== id))}
+                />
+            )}
+            {editingList && (
+                <ListEditor
+                    key={editingList === "new" ? "new" : editingList.id}
+                    list={editingList === "new" ? undefined : editingList}
+                    onClose={() => setEditingList(null)}
+                    onDeleted={id => { if (listFilter === id) onListFilterChange(null); }}
                 />
             )}
         </AppShell.Navbar>

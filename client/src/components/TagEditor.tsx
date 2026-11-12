@@ -1,13 +1,10 @@
 import { useState } from "react";
 import { Alert, Button, ColorInput, Group, Modal, Stack, TextInput } from "@mantine/core";
 import { useDeleteTagMutation, useUpdateTagMutation } from "../state/api/tagApi";
+import { errorMessage } from "../state/api/errorMessage";
 import type { Tag } from "../types/tag";
-import type { AuthError } from "../types/user";
 
 type Props = { tag: Tag; onClose: () => void; onDeleted: (id: number) => void };
-
-const errorMessage = (err: unknown, fallback: string) =>
-    (err as { data?: AuthError })?.data?.errors?.join(" ") || fallback;
 
 const TagEditor = ({ tag, onClose, onDeleted }: Props) => {
     const [updateTag, { isLoading: saving }] = useUpdateTagMutation();

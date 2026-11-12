@@ -6,12 +6,13 @@ const placeChanged = ['Place', 'Tag', 'List'] as const;
 
 export const placeApi = baseApi.injectEndpoints({
     endpoints: (builder) => ({
-        // With tag_ids, returns places that have any of those tags.
-        getPlaces: builder.query<Place[], { tag_ids?: number[] } | void>({
+        // With tag_ids, returns places that have any of those tags; with list_id, only that list's places. Both combine.
+        getPlaces: builder.query<Place[], { tag_ids?: number[]; list_id?: number } | void>({
             // Built by hand: RTK's params would send tag_ids=1,2, which Rails reads as one id, not an array.
             query: (filter) => {
-                const ids = filter?.tag_ids ?? [];
-                return ids.length ? `/api/places?${ids.map(id => `tag_ids[]=${id}`).join('&')}` : '/api/places';
+                const params = (filter?.tag_ids ?? []).map(id => `tag_ids[]=${id}`);
+                if (filter?.list_id) params.push(`list_id=${filter.list_id}`);
+                return params.length ? `/api/places?${params.join('&')}` : '/api/places';
             },
             providesTags: (result = []) => [
                 { type: 'Place', id: 'LIST' },

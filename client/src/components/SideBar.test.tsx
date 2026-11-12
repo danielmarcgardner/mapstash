@@ -16,7 +16,7 @@ const renderSideBar = () => {
         <MantineProvider>
             <Provider store={store}>
                 <AppShell navbar={{ width: 200, breakpoint: 'sm' }}>
-                    <SideBar tagFilter={[]} onTagFilterChange={() => {}} />
+                    <SideBar tagFilter={[]} onTagFilterChange={() => {}} listFilter={null} onListFilterChange={() => {}} />
                 </AppShell>
             </Provider>
         </MantineProvider>,
@@ -40,7 +40,7 @@ describe('SideBar', () => {
         const store = renderSideBar();
 
         expect(await screen.findByRole('button', { name: 'Brunch 0' })).toBeInTheDocument(); // name plus places count
-        expect(await screen.findByText('SF Trip')).toBeInTheDocument();
+        expect(await screen.findByRole('button', { name: 'SF Trip 0' })).toBeInTheDocument();
 
         await act(() => store.dispatch(tagApi.endpoints.createTag.initiate({ name: 'Coffee', color: '#fff' })));
         expect(await screen.findByRole('button', { name: 'Coffee 0' })).toBeInTheDocument();

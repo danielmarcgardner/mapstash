@@ -36,7 +36,7 @@ class FakeBounds {
 
 const tag = { id: 1, name: 'Coffee', color: '#ff8800' };
 const place = (id: number, extra: object = {}) => ({
-    id, title: `Place ${id}`, address: 'x', lat: 30 + id, lng: -80 - id, tags: [], list_ids: [],
+    id, title: `Place ${id}`, address: 'x', lat: 30 + id, lng: -80 - id, tags: [], list_ids: [] as number[],
     description: null, image_url: null, location_name: null, link_url: null, visited: null, notes: null,
     google_place_id: null, created_at: '', updated_at: '', ...extra,
 });
@@ -497,6 +497,30 @@ describe('Place form tags', () => {
         expect(await within(screen.getByRole('dialog', { name: 'Add place' })).findByRole('alert')).toHaveTextContent('Name is too long');
         expect(count('POST', '/api/places')).toBe(0);
     });
+
+    it('saves a new place into two lists', async () => {
+        const { calls } = renderDashboard([], undefined, { 'POST /api/places': () => place(9, { list_ids: [7, 8] }) });
+        await openAddForm();
+        for (const name of ['Date night', 'Brunch']) {
+            fireEvent.click(screen.getByRole('textbox', { name: 'Lists' }));
+            fireEvent.click(await screen.findByRole('option', { name, hidden: true }));
+        }
+        save();
+
+        await vi.waitFor(() => expect(calls.find(c => c.method === 'POST')?.body).toEqual({ place: expect.objectContaining({ list_ids: [7, 8] }) }));
+    });
+
+    it("removes a place from a list and sends only the lists", async () => {
+        const { calls } = renderDashboard(null, () => [place(1, { list_ids: [7, 8] })], {
+            'PATCH /api/places/1': () => place(1, { list_ids: [7] }),
+        });
+        fireEvent.click((await screen.findAllByTestId('marker'))[0]);
+        fireEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+        fireEvent.keyDown(await screen.findByRole('textbox', { name: 'Lists' }), { key: 'Backspace' }); // removes the last list, Brunch
+        save();
+
+        await vi.waitFor(() => expect(calls.find(c => c.method === 'PATCH')?.body).toEqual({ place: { list_ids: [7] } }));
+    });
 });
 
 describe('Tag filter and management', () => {
@@ -543,11 +567,11 @@ describe('Tag filter and management', () => {
             return placesFor(body, url);
         }, { 'GET /api/tags': () => [tagRow(lonely, 0), tagRow(coffee, 1)] });
         fireEvent.click(await tagButton('Lonely'));
-        expect(await screen.findByText('No places with these tags')).toBeInTheDocument();
+        expect(await screen.findByText('No places match this filter')).toBeInTheDocument();
 
         // The Lonely + Coffee request is held open; the old empty result must not be presented as this filter's answer.
         fireEvent.click(await tagButton('Coffee'));
-        await vi.waitFor(() => expect(screen.queryByText('No places with these tags')).not.toBeInTheDocument());
+        await vi.waitFor(() => expect(screen.queryByText('No places match this filter')).not.toBeInTheDocument());
         await vi.waitFor(() => expect(release).not.toBeNull()); // the request reached the stub and is held
         release!();
         await vi.waitFor(() => expect(screen.getAllByTestId('marker')).toHaveLength(1));
@@ -557,7 +581,7 @@ describe('Tag filter and management', () => {
         const lonely = { id: 5, name: 'Lonely', color: '#123456' };
         renderDashboard(null, placesFor, { 'GET /api/tags': () => [tagRow(lonely, 0)] });
         fireEvent.click(await tagButton('Lonely'));
-        expect(await screen.findByText('No places with these tags')).toBeInTheDocument();
+        expect(await screen.findByText('No places match this filter')).toBeInTheDocument();
         expect(screen.queryByText('No places yet')).not.toBeInTheDocument();
     });
 
@@ -620,5 +644,147 @@ describe('Tag filter and management', () => {
         // The filter dropped the deleted tag, so every place shows again.
         await vi.waitFor(() => expect(screen.getAllByTestId('marker')).toHaveLength(3));
         expect(placeQueries(calls).slice(-1)).toEqual(['']);
+    });
+});
+
+describe('List filter and management', () => {
+    const coffee = { id: 1, name: 'Coffee', color: '#ff8800' };
+    const allPlaces = [place(1, { list_ids: [7, 8], tags: [coffee] }), place(2, { list_ids: [7] }), place(3)];
+    // Answers like the API: places in list_id (if given) that have any of tag_ids (if given).
+    const placesFor = (_body: unknown, url: URL) => {
+        const listId = Number(url.searchParams.get('list_id'));
+        const tagIds = url.searchParams.getAll('tag_ids[]').map(Number);
+        return allPlaces.filter(p => (!listId || p.list_ids.includes(listId))
+            && (!tagIds.length || (p.tags as { id: number }[]).some(t => tagIds.includes(t.id))));
+    };
+    const listRow = (id: number, title: string, place_ids: number[]) => ({ id, title, description: null, places_count: place_ids.length, place_ids });
+    const defaultLists = () => [listRow(7, 'Date night', [1, 2]), listRow(8, 'Brunch', [1])];
+    const placeQueries = (calls: { method: string; path: string; query: string }[]) =>
+        calls.filter(c => c.method === 'GET' && c.path === '/api/places').map(c => c.query);
+    const listButton = (name: string) => screen.findByRole('button', { name: new RegExp(`^${name} \\d+$`) });
+
+    it('shows each list with its places count', async () => {
+        renderDashboard(null, placesFor, { 'GET /api/lists': defaultLists });
+        expect(await screen.findByRole('button', { name: 'Date night 2' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Brunch 1' })).toBeInTheDocument();
+    });
+
+    it('shows a place in two lists when either is selected, and clears on a second click', async () => {
+        const { calls } = renderDashboard(null, placesFor, { 'GET /api/lists': defaultLists });
+        expect(await screen.findAllByTestId('marker')).toHaveLength(3);
+
+        fireEvent.click(await listButton('Brunch'));
+        await vi.waitFor(() => expect(screen.getAllByTestId('marker')).toHaveLength(1));
+        expect(screen.getByTestId('marker')).toHaveAttribute('title', 'Place 1');
+        expect(await listButton('Brunch')).toHaveAttribute('aria-pressed', 'true');
+
+        fireEvent.click(await listButton('Date night'));
+        await vi.waitFor(() => expect(screen.getAllByTestId('marker')).toHaveLength(2));
+        expect(screen.getAllByTestId('marker').map(m => m.title)).toContain('Place 1');
+        expect(await listButton('Brunch')).toHaveAttribute('aria-pressed', 'false');
+
+        fireEvent.click(await listButton('Date night'));
+        await vi.waitFor(() => expect(screen.getAllByTestId('marker')).toHaveLength(3));
+        expect(placeQueries(calls)).toEqual(['', '?list_id=8', '?list_id=7']);
+    });
+
+    it('combines the list filter with the tag filter', async () => {
+        const { calls } = renderDashboard(null, placesFor, {
+            'GET /api/lists': defaultLists,
+            'GET /api/tags': () => [{ ...coffee, places_count: 1 }],
+        });
+        fireEvent.click(await screen.findByRole('button', { name: 'Coffee 1' }));
+        fireEvent.click(await listButton('Date night'));
+        await vi.waitFor(() => expect(placeQueries(calls).slice(-1)).toEqual(['?tag_ids[]=1&list_id=7']));
+        await vi.waitFor(() => expect(screen.getAllByTestId('marker')).toHaveLength(1));
+    });
+
+    it('says when no places match the selected list', async () => {
+        renderDashboard(null, placesFor, { 'GET /api/lists': () => [listRow(9, 'Empty', [])] });
+        fireEvent.click(await listButton('Empty'));
+        expect(await screen.findByText('No places match this filter')).toBeInTheDocument();
+        expect(screen.queryByText('No places yet')).not.toBeInTheDocument();
+    });
+
+    it('creates a list from the modal without a reload, requiring a title', async () => {
+        const rows = defaultLists();
+        const { calls, count } = renderDashboard(null, placesFor, {
+            'GET /api/lists': () => rows,
+            'POST /api/lists': (body) => {
+                const created = listRow(10, (body as { list: { title: string } }).list.title, []);
+                rows.push(created);
+                return created;
+            },
+        });
+        fireEvent.click(await screen.findByRole('button', { name: 'New list' }));
+        const editor = within(await screen.findByRole('dialog', { name: 'New list' }));
+        expect(editor.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
+        fireEvent.click(editor.getByRole('button', { name: 'Save' }));
+        expect(await editor.findByRole('alert')).toHaveTextContent('Title is required');
+        expect(count('POST', '/api/lists')).toBe(0);
+
+        fireEvent.change(editor.getByLabelText('Title'), { target: { value: 'Weekend' } });
+        fireEvent.click(editor.getByRole('button', { name: 'Save' }));
+
+        await vi.waitFor(() => expect(calls.find(c => c.method === 'POST')?.body).toEqual({ list: { title: 'Weekend' } }));
+        expect(await screen.findByRole('button', { name: 'Weekend 0' })).toBeInTheDocument();
+        await vi.waitFor(() => expect(screen.queryByRole('dialog', { name: 'New list' })).not.toBeInTheDocument());
+    });
+
+    it('renames a list in the sidebar and in the open place details', async () => {
+        let rows = defaultLists();
+        const { calls } = renderDashboard(null, placesFor, {
+            'GET /api/lists': () => rows,
+            'PATCH /api/lists/8': (body) => {
+                rows = rows.map(l => (l.id === 8 ? { ...l, ...(body as { list: object }).list } : l));
+                return rows.find(l => l.id === 8);
+            },
+        });
+        fireEvent.click((await screen.findAllByTestId('marker'))[0]);
+        const drawer = within(await screen.findByRole('dialog', { name: 'Place 1' }));
+        expect(await drawer.findByText('Brunch')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Edit Brunch' }));
+        const editor = within(await screen.findByRole('dialog', { name: 'Edit list' }));
+        fireEvent.change(editor.getByLabelText('Title'), { target: { value: 'Sunday brunch' } });
+        fireEvent.click(editor.getByRole('button', { name: 'Save' }));
+
+        await vi.waitFor(() => expect(calls.find(c => c.method === 'PATCH')?.body).toEqual({ list: { title: 'Sunday brunch' } }));
+        expect(await screen.findByRole('button', { name: 'Sunday brunch 1' })).toBeInTheDocument();
+        expect(await drawer.findByText('Sunday brunch')).toBeInTheDocument();
+    });
+
+    it('shows the API error when a rename fails', async () => {
+        renderDashboard([], undefined, {
+            'GET /api/lists': defaultLists,
+            'PATCH /api/lists/8': () => jsonResponse(422, { errors: ['Title has already been taken'] }),
+        });
+        fireEvent.click(await screen.findByRole('button', { name: 'Edit Brunch' }));
+        const editor = within(await screen.findByRole('dialog', { name: 'Edit list' }));
+        fireEvent.change(editor.getByLabelText('Title'), { target: { value: 'Date night' } });
+        fireEvent.click(editor.getByRole('button', { name: 'Save' }));
+        expect(await editor.findByRole('alert')).toHaveTextContent('Title has already been taken');
+    });
+
+    it('deletes a list after confirming, clears the filter and keeps its places on the map', async () => {
+        let deleted = false;
+        const { count } = renderDashboard(null, placesFor, {
+            'GET /api/lists': () => (deleted ? [listRow(8, 'Brunch', [1])] : defaultLists()),
+            'DELETE /api/lists/7': () => { deleted = true; return new Response(null, { status: 204 }); },
+        });
+        fireEvent.click(await listButton('Date night'));
+        await vi.waitFor(() => expect(screen.getAllByTestId('marker')).toHaveLength(2));
+
+        fireEvent.click(screen.getByRole('button', { name: 'Edit Date night' }));
+        const editor = within(await screen.findByRole('dialog', { name: 'Edit list' }));
+        fireEvent.click(editor.getByRole('button', { name: 'Delete' }));
+        fireEvent.click(editor.getByRole('button', { name: 'Cancel' }));
+        expect(count('DELETE', '/api/lists/7')).toBe(0);
+        fireEvent.click(editor.getByRole('button', { name: 'Delete' }));
+        fireEvent.click(editor.getByRole('button', { name: 'Delete this list?' }));
+
+        await vi.waitFor(() => expect(screen.queryByRole('button', { name: /^Date night \d+$/ })).not.toBeInTheDocument());
+        expect(count('DELETE', '/api/lists/7')).toBe(1);
+        await vi.waitFor(() => expect(screen.getAllByTestId('marker')).toHaveLength(3));
     });
 });

@@ -66,7 +66,11 @@ const MapOverlay = ({ children, alert = false }: { children: React.ReactNode; al
 
 const Dashboard = () => {
     const [tagFilter, setTagFilter] = useState<number[]>([]);
-    const { data: places, isLoading, isFetching, isError, isSuccess } = useGetPlacesQuery(tagFilter.length ? { tag_ids: tagFilter } : undefined);
+    const [listFilter, setListFilter] = useState<number | null>(null);
+    const filtered = tagFilter.length > 0 || listFilter !== null;
+    const { data: places, isLoading, isFetching, isError, isSuccess } = useGetPlacesQuery(
+        filtered ? { tag_ids: tagFilter, list_id: listFilter ?? undefined } : undefined,
+    );
     const mappable = useMemo(
         () => (places ?? []).filter((p): p is MappablePlace => p.lat !== null && p.lng !== null),
         [places],
@@ -78,7 +82,7 @@ const Dashboard = () => {
 
     return (
         <AppShellComponent onAddPlace={() => setFormPlace("new")}>
-            <SideBar tagFilter={tagFilter} onTagFilterChange={setTagFilter} />
+            <SideBar tagFilter={tagFilter} onTagFilterChange={setTagFilter} listFilter={listFilter} onListFilterChange={setListFilter} />
 
             <AppShell.Main className="p-0">
                 <div className="relative w-full h-[calc(100vh-60px)]">
@@ -122,8 +126,8 @@ const Dashboard = () => {
                     {/* While a new filter loads, data is still the previous result, so wait before calling it empty. */}
                     {isSuccess && !isFetching && mappable.length === 0 && (
                         <MapOverlay>
-                            {tagFilter.length ? (
-                                <Text fw={600}>No places with these tags</Text>
+                            {filtered ? (
+                                <Text fw={600}>No places match this filter</Text>
                             ) : (
                                 <>
                                     <Text fw={600}>No places yet</Text>
