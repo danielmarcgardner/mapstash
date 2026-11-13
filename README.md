@@ -57,7 +57,7 @@ This runs RuboCop, Brakeman and RSpec in the backend container, then ESLint, `ts
 
 ## Production (Render)
 
-The live app is **https://mapstash.fun**, hosted on [Render](https://render.com) for about $13/month. Everything Render runs is defined in [`render.yaml`](render.yaml) (a Render Blueprint):
+The live app is **https://www.mapstash.fun** (`mapstash.fun` redirects to it), hosted on [Render](https://render.com) for about $13/month. Everything Render runs is defined in [`render.yaml`](render.yaml) (a Render Blueprint):
 
 | Service | Render name | Plan | Cost |
 |---|---|---|---|
@@ -97,7 +97,7 @@ The app refuses to boot if `JWT_SECRET_KEY` or `DATABASE_URL` is missing, and th
 
 ### Custom domain and DNS
 
-In Render, add `mapstash.fun` under the service's **Settings → Custom Domains** first. Render adds `www.mapstash.fun` too, redirects it to the root, and issues the HTTPS certificate after verification. All `http://` traffic redirects to `https://`.
+In Render, add `www.mapstash.fun` under the service's **Settings → Custom Domains** first. Render adds `mapstash.fun` too, redirects it to `www`, and issues the HTTPS certificate for both after verification. All `http://` traffic redirects to `https://`.
 
 Then set these records at the domain registrar:
 
@@ -130,10 +130,10 @@ A rollback brings back that deploy's env vars too, so after rolling back, re-che
 
 ## Smoke test
 
-Run this after every production deploy that changes behavior, on a desktop browser and on a phone, against https://mapstash.fun:
+Run this after every production deploy that changes behavior, on a desktop browser and on a phone, against https://www.mapstash.fun:
 
-- [ ] `https://mapstash.fun` loads the login page, and `http://mapstash.fun` and `https://www.mapstash.fun` both redirect to it.
-- [ ] `https://mapstash.fun/up` returns 200.
+- [ ] `https://www.mapstash.fun` loads the login page, and `http://mapstash.fun` and `https://mapstash.fun` both redirect to it.
+- [ ] `https://www.mapstash.fun/up` returns 200.
 - [ ] Sign up with a new email. You land on the map.
 - [ ] Create a list, then add a place: search a location, add a new tag, put it in the list, save. Its pin appears on the map.
 - [ ] Refresh the page. You're still logged in, and the place, tag and list are still there.
