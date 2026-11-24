@@ -12,7 +12,7 @@
 #  location_name   :string
 #  notes           :text
 #  title           :string
-#  visited         :boolean
+#  visited_on      :date
 #  created_at      :datetime         not null
 #  updated_at      :datetime         not null
 #  google_place_id :string
@@ -38,8 +38,22 @@ class Place < ApplicationRecord
   validates :lat, presence: true, numericality: { in: -90..90, allow_nil: true }
   validates :lng, presence: true, numericality: { in: -180..180, allow_nil: true }
   validate :link_url_is_http
+  validate :visited_on_is_a_past_date
+
+  def visited?
+    visited_on.present?
+  end
 
   private
+
+  def visited_on_is_a_past_date
+    # A string that doesn't parse casts to nil; without this it would silently clear the visit.
+    if visited_on.nil? && visited_on_before_type_cast.present?
+      errors.add(:visited_on, "is not a valid date")
+    elsif visited_on&.after?(Date.current)
+      errors.add(:visited_on, "can't be in the future")
+    end
+  end
 
   def link_url_is_http
     return if link_url.blank?

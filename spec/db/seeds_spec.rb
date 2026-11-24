@@ -53,6 +53,14 @@ RSpec.describe "db/seeds.rb", type: :request do
     end
   end
 
+  it "marks two places visited on a past date" do
+    seed
+
+    visited = seed_user.places.where.not(visited_on: nil)
+    expect(visited.pluck(:title)).to contain_exactly("Sammys Sandwich Shop", "Trip to Dahlonega")
+    expect(visited.pluck(:visited_on)).to all(be <= Date.current)
+  end
+
   it "only uses the seed user's own tags and lists when another user has the same names" do
     other = create(:user)
     other.tags.create!(name: "Family Friendly")

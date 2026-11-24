@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_09_161500) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_24_200000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -61,12 +61,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_09_161500) do
     t.text "notes"
     t.string "link_url"
     t.string "image_url"
-    t.boolean "visited"
     t.bigint "user_id", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.string "description"
     t.string "google_place_id"
+    t.date "visited_on"
     t.index ["google_place_id"], name: "index_places_on_google_place_id"
     t.index ["user_id"], name: "index_places_on_user_id"
   end

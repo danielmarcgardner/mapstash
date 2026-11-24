@@ -14,7 +14,8 @@ type Place = {
     image_url: string | null;
     location_name: string | null;
     link_url: string | null;
-    visited: boolean | null;
+    visited: boolean;
+    visited_on: string | null;
     notes: string | null;
     google_place_id: string | null;
     tags: PlaceTag[];
@@ -23,7 +24,7 @@ type Place = {
     updated_at: string;
 }
 
-type CreatePlacePayload = Partial<Omit<Place, 'id' | 'title' | 'lat' | 'lng' | 'tags' | 'list_ids' | 'created_at' | 'updated_at'>> & {
+type CreatePlacePayload = Partial<Omit<Place, 'id' | 'title' | 'lat' | 'lng' | 'visited' | 'visited_on' | 'tags' | 'list_ids' | 'created_at' | 'updated_at'>> & {
     title: string;
     lat: number;
     lng: number;
