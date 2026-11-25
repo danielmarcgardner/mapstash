@@ -27,6 +27,15 @@ export const placeApi = baseApi.injectEndpoints({
             query: ({ id, ...place }) => ({ url: `/api/places/${id}`, method: 'PATCH', body: { place } }),
             invalidatesTags: [...placeChanged],
         }),
+        // A visit only changes the place itself, so tag and list counts don't refetch.
+        markVisited: builder.mutation<Place, { id: number; visited_on?: string }>({
+            query: ({ id, visited_on }) => ({ url: `/api/places/${id}/visit`, method: 'POST', body: { visited_on } }),
+            invalidatesTags: (_result, _error, { id }) => [{ type: 'Place', id }],
+        }),
+        clearVisited: builder.mutation<Place, number>({
+            query: (id) => ({ url: `/api/places/${id}/visit`, method: 'DELETE' }),
+            invalidatesTags: (_result, _error, id) => [{ type: 'Place', id }],
+        }),
         deletePlace: builder.mutation<void, number>({
             query: (id) => ({ url: `/api/places/${id}`, method: 'DELETE' }),
             invalidatesTags: [...placeChanged],
@@ -39,4 +48,6 @@ export const {
     useCreatePlaceMutation,
     useUpdatePlaceMutation,
     useDeletePlaceMutation,
+    useMarkVisitedMutation,
+    useClearVisitedMutation,
 } = placeApi;

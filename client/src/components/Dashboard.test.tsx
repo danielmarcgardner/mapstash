@@ -6,6 +6,7 @@ import { jsonResponse, stubFetch, type Route } from '../test/fetchStub';
 import { renderWithStore } from '../test/renderWithStore';
 import { baseApi } from '../state/api/baseApi';
 import { darken, TAG_PALETTE } from '../tagColors';
+import dayjs from 'dayjs';
 
 // jsdom can't run Google Maps, so the library is replaced with inspectable stand-ins.
 const map = vi.hoisted(() => ({
@@ -85,7 +86,7 @@ class FakeBounds {
 const tag = { id: 1, name: 'Coffee', color: '#ff8800' };
 const place = (id: number, extra: object = {}) => ({
     id, title: `Place ${id}`, address: 'x', lat: 30 + id, lng: -80 - id, tags: [], list_ids: [] as number[],
-    description: null, image_url: null, location_name: null, link_url: null, visited: false, visited_on: null, notes: null,
+    description: null, image_url: null, location_name: null, link_url: null, visited: false, visited_on: null as string | null, notes: null,
     google_place_id: null, created_at: '', updated_at: '', ...extra,
 });
 
@@ -312,6 +313,86 @@ describe('Place details', () => {
         fireEvent.click(drawer.getByRole('button', { name: 'Cancel' }));
         expect(drawer.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
         expect(count('DELETE', '/api/places/1')).toBe(0);
+    });
+
+    describe('visits', () => {
+        const today = dayjs().format('YYYY-MM-DD');
+        // The fake server keeps one place and applies visit calls to it, like the real API.
+        const renderVisits = (start: object = {}, visitRoute?: Route) => {
+            let current = place(1, start);
+            return renderDashboard(null, () => [current], {
+                'POST /api/places/1/visit': visitRoute ?? ((body) => {
+                    const { visited_on } = body as { visited_on: string };
+                    current = { ...current, visited: true, visited_on };
+                    return current;
+                }),
+                'DELETE /api/places/1/visit': () => (current = { ...current, visited: false, visited_on: null }),
+            });
+        };
+
+        it('marks a place visited today in one tap and shows the badge without a reload', async () => {
+            const { calls, count } = renderVisits();
+            const drawer = within(await openMarker('Place 1'));
+            fireEvent.click(drawer.getByRole('button', { name: 'Mark visited' }));
+
+            const label = `Visited ${dayjs().toDate().toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
+            expect(await drawer.findByText(label)).toBeInTheDocument();
+            expect(calls.find(c => c.method === 'POST')?.body).toEqual({ visited_on: today });
+            expect(count('GET', '/api/places')).toBe(2); // refetched, not reloaded
+            expect(drawer.queryByRole('button', { name: 'Mark visited' })).not.toBeInTheDocument();
+        });
+
+        it("shows the date in the user's locale, with the year only when it isn't this year", async () => {
+            renderVisits({ visited: true, visited_on: `${dayjs().year()}-01-01` });
+            expect(within(await openMarker('Place 1')).getByText('Visited Jan 1')).toBeInTheDocument();
+        });
+
+        it('shows the year for a visit in an earlier year', async () => {
+            renderVisits({ visited: true, visited_on: '2024-03-04' });
+            expect(within(await openMarker('Place 1')).getByText('Visited Mar 4, 2024')).toBeInTheDocument();
+        });
+
+        it('changes the date to a past day picked from the calendar', async () => {
+            const { calls } = renderVisits({ visited: true, visited_on: '2024-03-04' });
+            const drawer = within(await openMarker('Place 1'));
+            fireEvent.click(drawer.getByRole('button', { name: 'Visited' }));
+            fireEvent.click(await screen.findByRole('button', { name: '1 March 2024' }));
+
+            expect(await drawer.findByText('Visited Mar 1, 2024')).toBeInTheDocument();
+            expect(calls.find(c => c.method === 'POST')?.body).toEqual({ visited_on: '2024-03-01' });
+        });
+
+        it("won't let a future day be picked", async () => {
+            renderVisits({ visited: true, visited_on: today });
+            fireEvent.click(within(await openMarker('Place 1')).getByRole('button', { name: 'Visited' }));
+
+            expect(await screen.findByRole('button', { name: dayjs().format('D MMMM YYYY') })).toBeEnabled();
+            for (let day = dayjs().add(1, 'day'); day.isSame(dayjs(), 'month'); day = day.add(1, 'day')) {
+                // Disabled days and arrows drop out of getByRole's accessible-name lookup, so match their aria-label directly.
+                expect(screen.getByLabelText(day.format('D MMMM YYYY'))).toBeDisabled();
+            }
+            expect(screen.getByLabelText('Next month')).toBeDisabled();
+        });
+
+        it('removes the badge with Mark not visited', async () => {
+            const { count } = renderVisits({ visited: true, visited_on: '2024-03-04' });
+            const drawer = within(await openMarker('Place 1'));
+            fireEvent.click(drawer.getByRole('button', { name: 'Visited' }));
+            fireEvent.click(await screen.findByRole('button', { name: 'Mark not visited' }));
+
+            expect(await drawer.findByRole('button', { name: 'Mark visited' })).toBeInTheDocument();
+            expect(drawer.queryByText(/^Visited /)).not.toBeInTheDocument();
+            expect(count('DELETE', '/api/places/1/visit')).toBe(1);
+        });
+
+        it('shows an error and no badge when marking visited fails', async () => {
+            renderVisits({}, () => jsonResponse(500));
+            const drawer = within(await openMarker('Place 1'));
+            fireEvent.click(drawer.getByRole('button', { name: 'Mark visited' }));
+
+            expect(await drawer.findByRole('alert')).toHaveTextContent("Couldn't update the visit");
+            expect(drawer.queryByText(/^Visited /)).not.toBeInTheDocument();
+        });
     });
 
     it('shows an error and keeps the place when the delete fails', async () => {
