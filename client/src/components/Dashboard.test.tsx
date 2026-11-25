@@ -375,6 +375,29 @@ describe('Place details', () => {
             expect(screen.getByLabelText('Next month')).toBeDisabled();
         });
 
+        it('closes only the date picker on Escape, then the drawer on a second Escape', async () => {
+            renderVisits({ visited: true, visited_on: '2024-03-04' });
+            const drawer = within(await openMarker('Place 1'));
+            const visitedButton = drawer.getByRole('button', { name: 'Visited' });
+            visitedButton.focus(); // a real click focuses the button; fireEvent.click doesn't
+            fireEvent.click(visitedButton);
+            await screen.findByRole('button', { name: '4 March 2024' });
+            // Focus moves into the picker, so the user's Escape lands there, not on the Visited button.
+            const picker = document.querySelector('.mantine-Popover-dropdown')!;
+            await vi.waitFor(() => expect(picker.contains(document.activeElement)).toBe(true));
+
+            fireEvent.keyDown(document.activeElement!, { key: 'Escape' });
+            await vi.waitFor(() => expect(screen.queryByRole('button', { name: '4 March 2024' })).not.toBeInTheDocument());
+            // A closing drawer stays in the DOM while it animates out, so wait past that before checking it stayed.
+            await new Promise(resolve => setTimeout(resolve, 500));
+            expect(screen.getByRole('dialog')).toBeInTheDocument();
+            expect(drawer.getByText('Visited Mar 4, 2024')).toBeInTheDocument();
+            await vi.waitFor(() => expect(visitedButton).toHaveFocus());
+
+            fireEvent.keyDown(visitedButton, { key: 'Escape' });
+            await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+        });
+
         it('removes the badge with Mark not visited', async () => {
             const { count } = renderVisits({ visited: true, visited_on: '2024-03-04' });
             const drawer = within(await openMarker('Place 1'));

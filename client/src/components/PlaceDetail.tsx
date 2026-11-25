@@ -69,8 +69,10 @@ const PlaceDetail = ({ place, onClose, onEdit }: Props) => {
 
     const placeLists = lists.filter(list => shown?.list_ids.includes(list.id));
 
+    // The date popover traps focus, so Escape lands in it; that keydown also bubbles (through its portal) to the drawer,
+    // so the drawer ignores Escape while the popover is open.
     return (
-        <Drawer opened={!!place} onClose={onClose} position="right" size={isPhone ? "100%" : undefined} title={<Text fw={600}>{shown?.title}</Text>}>
+        <Drawer opened={!!place} onClose={onClose} closeOnEscape={!pickingDate} position="right" size={isPhone ? "100%" : undefined} title={<Text fw={600}>{shown?.title}</Text>}>
             {shown && (
                 <Stack gap="sm">
                     {shown.visited_on && <Badge color="green" w="fit-content">Visited {formatVisit(shown.visited_on)}</Badge>}
@@ -104,7 +106,7 @@ const PlaceDetail = ({ place, onClose, onEdit }: Props) => {
                     <Group grow>
                         <Button variant="default" onClick={onEdit}>Edit</Button>
                         {shown.visited_on ? (
-                            <Popover opened={pickingDate} onChange={setPickingDate} position="bottom-end" shadow="md">
+                            <Popover opened={pickingDate} onChange={setPickingDate} position="bottom-end" shadow="md" trapFocus returnFocus>
                                 <Popover.Target>
                                     <Button color="green" variant="light" onClick={() => setPickingDate(o => !o)} loading={marking || clearing}>
                                         Visited
