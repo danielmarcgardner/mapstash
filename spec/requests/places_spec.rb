@@ -63,6 +63,14 @@ RSpec.describe "Places", type: :request do
       expect(body["lng"]).to be_a(Float).and eq(place.lng.to_f)
       expect(body["tags"]).to eq([ { "id" => tag.id, "name" => "Coffee", "color" => "#aabbcc" } ])
     end
+
+    it "returns visited and visited_on" do
+      create(:place, user: user, visited_on: Date.new(2026, 1, 2))
+
+      get "/api/places", headers: auth_headers(user)
+
+      expect(response.parsed_body.first).to include("visited" => true, "visited_on" => "2026-01-02")
+    end
   end
 
   describe "GET /api/places/:id" do
@@ -97,7 +105,7 @@ RSpec.describe "Places", type: :request do
       {
         title: "Sammys", description: "Sandwiches", notes: "Get the cuban", address: "565 Northside Dr SW",
         location_name: "Sammy's Sandwich Shop", lat: 33.7465, lng: -84.4078, google_place_id: "ChIJabc",
-        link_url: "https://www.instagram.com/reel/abc", image_url: "https://example.com/a.jpg", visited: true
+        link_url: "https://www.instagram.com/reel/abc", image_url: "https://example.com/a.jpg"
       }
     end
 
@@ -108,6 +116,13 @@ RSpec.describe "Places", type: :request do
 
       expect(response).to have_http_status(:created)
       expect(response.parsed_body).to include(attrs.stringify_keys)
+    end
+
+    it "ignores visited_on, which only changes through /visit" do
+      post "/api/places", params: { place: attrs.merge(visited_on: "2026-01-02") }.to_json, headers: auth_headers(user)
+
+      expect(response).to have_http_status(:created)
+      expect(response.parsed_body).to include("visited" => false, "visited_on" => nil)
     end
 
     it "ignores a user_id in the params" do
@@ -351,6 +366,25 @@ RSpec.describe "Places", type: :request do
       place_with(tags: [ coffee ])
 
       expect(ids_for("tag_ids[]=0")).to eq([])
+    end
+
+    it "filters on visited=true and visited=false" do
+      visited = place_with(visited_on: Date.new(2026, 1, 2))
+      unvisited = place_with
+
+      expect(ids_for("visited=true")).to eq([ visited.id ])
+      expect(ids_for("visited=false")).to eq([ unvisited.id ])
+      expect(ids_for("visited=junk")).to contain_exactly(visited.id, unvisited.id)
+    end
+
+    it "requires all three when visited, tag_ids and list_id are given" do
+      match = place_with(tags: [ coffee ], lists: [ favorites ], visited_on: Date.new(2026, 1, 2))
+      place_with(tags: [ coffee ], lists: [ favorites ])
+      place_with(tags: [ coffee ], visited_on: Date.new(2026, 1, 2))
+      place_with(lists: [ favorites ], visited_on: Date.new(2026, 1, 2))
+
+      expect(ids_for("visited=true&tag_ids[]=#{coffee.id}&list_id=#{favorites.id}")).to eq([ match.id ])
+      expect(ids_for("visited=false&tag_ids[]=#{coffee.id}&list_id=#{favorites.id}")).not_to include(match.id)
     end
 
     it "doesn't add a query per place when filtering" do

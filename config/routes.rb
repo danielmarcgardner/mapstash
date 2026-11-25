@@ -15,6 +15,7 @@ Rails.application.routes.draw do
   namespace :api do
     resources :places do
       resources :tags, only: %i[create destroy], controller: "place_tags"
+      resource :visit, only: %i[create destroy], controller: "place_visits"
     end
     resources :lists
     resources :tags

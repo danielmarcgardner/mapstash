@@ -12,7 +12,7 @@
 #  location_name   :string
 #  notes           :text
 #  title           :string
-#  visited         :boolean
+#  visited_on      :date
 #  created_at      :datetime         not null
 #  updated_at      :datetime         not null
 #  google_place_id :string
@@ -55,7 +55,36 @@ RSpec.describe Place, type: :model do
     expect(places.map { |place| place.reload.google_place_id }).to all(eq("ChIJ-shared-id"))
   end
 
+  describe "#visited?" do
+    it "is true only when visited_on is set" do
+      expect(build(:place, visited_on: Date.current).visited?).to be(true)
+      expect(build(:place, visited_on: nil).visited?).to be(false)
+    end
+  end
+
   describe "validations" do
+    it "accepts a visited_on of tomorrow, today, a past date or nil" do
+      [ Date.tomorrow, Date.current, Date.new(2020, 1, 1), nil ].each do |date|
+        expect(build(:place, visited_on: date)).to be_valid, "expected #{date.inspect} to be valid"
+      end
+    end
+
+    it "rejects a visited_on past tomorrow" do
+      place = build(:place, visited_on: Date.current + 2)
+
+      expect(place).not_to be_valid
+      expect(place.errors[:visited_on]).to eq([ "can't be in the future" ])
+    end
+
+    it "rejects a visited_on that isn't a date" do
+      [ "junk", 20260101, [ "2026-01-02" ] ].each do |value|
+        place = build(:place, visited_on: value)
+
+        expect(place).not_to be_valid, "expected #{value.inspect} to be invalid"
+        expect(place.errors[:visited_on]).to eq([ "is not a valid date" ])
+      end
+    end
+
     %i[title lat lng].each do |attr|
       it "requires #{attr}" do
         place = build(:place, attr => nil)

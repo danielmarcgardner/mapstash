@@ -16,6 +16,8 @@ module Api
         lists = current_user.lists.where(id: params[:list_id])
         @places = @places.where(id: ListPlace.where(list: lists).select(:place_id))
       end
+      @places = @places.where.not(visited_on: nil) if params[:visited] == "true"
+      @places = @places.where(visited_on: nil) if params[:visited] == "false"
       render json: @places, status: :ok
     end
 
@@ -70,7 +72,7 @@ module Api
     end
 
     def place_params
-      params.require(:place).permit(:title, :address, :lat, :lng, :description, :link_url, :image_url, :location_name, :notes, :visited,
+      params.require(:place).permit(:title, :address, :lat, :lng, :description, :link_url, :image_url, :location_name, :notes,
                                     :google_place_id, tag_ids: [], list_ids: [])
     end
   end

@@ -12,7 +12,7 @@
 #  location_name   :string
 #  notes           :text
 #  title           :string
-#  visited         :boolean
+#  visited_on      :date
 #  created_at      :datetime         not null
 #  updated_at      :datetime         not null
 #  google_place_id :string

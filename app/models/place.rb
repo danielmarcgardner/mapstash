@@ -12,7 +12,7 @@
 #  location_name   :string
 #  notes           :text
 #  title           :string
-#  visited         :boolean
+#  visited_on      :date
 #  created_at      :datetime         not null
 #  updated_at      :datetime         not null
 #  google_place_id :string
@@ -38,8 +38,23 @@ class Place < ApplicationRecord
   validates :lat, presence: true, numericality: { in: -90..90, allow_nil: true }
   validates :lng, presence: true, numericality: { in: -180..180, allow_nil: true }
   validate :link_url_is_http
+  validate :visited_on_is_a_past_date
+
+  def visited?
+    visited_on.present?
+  end
 
   private
+
+  def visited_on_is_a_past_date
+    # Anything that doesn't cast to a Date (junk string, number, array) would otherwise clear the visit or raise.
+    if visited_on_before_type_cast.present? && !visited_on.is_a?(Date)
+      errors.add(:visited_on, "is not a valid date")
+    # One day of slack: Date.current is UTC, and a user ahead of UTC may already be on tomorrow.
+    elsif visited_on&.after?(Date.tomorrow)
+      errors.add(:visited_on, "can't be in the future")
+    end
+  end
 
   def link_url_is_http
     return if link_url.blank?

@@ -85,7 +85,7 @@ class FakeBounds {
 const tag = { id: 1, name: 'Coffee', color: '#ff8800' };
 const place = (id: number, extra: object = {}) => ({
     id, title: `Place ${id}`, address: 'x', lat: 30 + id, lng: -80 - id, tags: [], list_ids: [] as number[],
-    description: null, image_url: null, location_name: null, link_url: null, visited: null, notes: null,
+    description: null, image_url: null, location_name: null, link_url: null, visited: false, visited_on: null, notes: null,
     google_place_id: null, created_at: '', updated_at: '', ...extra,
 });
 

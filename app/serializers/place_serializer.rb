@@ -14,7 +14,7 @@
 #  location_name   :string
 #  notes           :text
 #  title           :string
-#  visited         :boolean
+#  visited_on      :date
 #  created_at      :datetime         not null
 #  updated_at      :datetime         not null
 #  google_place_id :string
@@ -30,7 +30,7 @@
 #  fk_rails_...  (user_id => users.id)
 #
 class PlaceSerializer < ActiveModel::Serializer
-  attributes :id, :title, :address, :lat, :lng, :description, :image_url, :link_url, :location_name, :notes, :visited,
+  attributes :id, :title, :address, :lat, :lng, :description, :image_url, :link_url, :location_name, :notes, :visited, :visited_on,
              :google_place_id, :tags, :list_ids, :created_at, :updated_at
 
   def address
@@ -44,6 +44,10 @@ class PlaceSerializer < ActiveModel::Serializer
 
   def lng
     object.lng&.to_f
+  end
+
+  def visited
+    object.visited?
   end
 
   def list_ids
