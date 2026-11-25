@@ -5,7 +5,7 @@ import Dashboard from './Dashboard';
 import { jsonResponse, stubFetch, type Route } from '../test/fetchStub';
 import { renderWithStore } from '../test/renderWithStore';
 import { baseApi } from '../state/api/baseApi';
-import { darken, lighten, TAG_PALETTE } from '../tagColors';
+import { darken, TAG_PALETTE } from '../tagColors';
 import dayjs from 'dayjs';
 
 // jsdom can't run Google Maps, so the library is replaced with inspectable stand-ins.
@@ -941,16 +941,25 @@ describe('Visited pins and filter', () => {
     const markerTitles = () => screen.getAllByTestId('marker').map(m => m.title);
     const pinOf = (title: string) => screen.getAllByTestId('marker').find(m => m.title === title)!.querySelector('[data-testid="pin"]') as HTMLElement;
 
-    it('gives visited pins a check glyph and a lighter fill, tagged or not, and leaves unvisited pins alone', async () => {
-        renderDashboard([place(1, { ...visited, tags: [coffee] }), place(2, visited), place(3, { tags: [coffee] })]);
+    it("keeps a pin's color when visited and swaps the dot for a readable ✓", async () => {
+        const pale = { id: 5, name: 'Default', color: '#c1d5f5' };
+        const red = { id: 6, name: 'Red', color: '#e03131' };
+        renderDashboard([
+            place(1, { ...visited, tags: [pale] }), place(2, { ...visited, tags: [red] }), place(3, visited), place(4, { tags: [pale] }),
+        ]);
         await screen.findAllByTestId('marker');
+        // Pale tag: same fill and border as unvisited, dark ✓.
         expect({ ...pinOf('Place 1').dataset }).toEqual({
-            testid: 'pin', background: lighten('#ff8800'), border: darken('#ff8800'), glyph: darken('#ff8800'), glyphText: '✓',
+            testid: 'pin', background: '#c1d5f5', border: darken('#c1d5f5'), glyph: '#1a1b1e', glyphText: '✓',
         });
+        // Saturated tag: same fill and border, white ✓.
         expect({ ...pinOf('Place 2').dataset }).toEqual({
-            testid: 'pin', background: lighten('#ea4335'), border: darken('#ea4335'), glyph: darken('#ea4335'), glyphText: '✓',
+            testid: 'pin', background: '#e03131', border: darken('#e03131'), glyph: '#ffffff', glyphText: '✓',
         });
-        expect({ ...pinOf('Place 3').dataset }).toEqual({ testid: 'pin', background: '#ff8800', border: darken('#ff8800'), glyph: '#ffffff' });
+        // Untagged: Google's default pin, white ✓.
+        expect({ ...pinOf('Place 3').dataset }).toEqual({ testid: 'pin', background: '', border: '', glyph: '#ffffff', glyphText: '✓' });
+        // Unvisited: unchanged, no ✓.
+        expect({ ...pinOf('Place 4').dataset }).toEqual({ testid: 'pin', background: '#c1d5f5', border: darken('#c1d5f5'), glyph: '#ffffff' });
     });
 
     it('shows All / To visit / Visited with counts', async () => {

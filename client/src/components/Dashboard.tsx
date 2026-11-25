@@ -9,7 +9,7 @@ import PlaceDetail from "./PlaceDetail";
 import PlaceForm from "./PlaceForm";
 import { useGetPlacesQuery } from "../state/api/placeApi";
 import type { Place, VisitedFilter } from "../types/place";
-import { darken, lighten } from "../tagColors";
+import { darken, readableOn } from "../tagColors";
 
 const DEFAULT_CENTER = { lat: 33.7501, lng: -84.3885 }; // Atlanta
 const SINGLE_PLACE_ZOOM = 14;
@@ -17,7 +17,6 @@ const SINGLE_PLACE_ZOOM = 14;
 const MAP_ID = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID || "DEMO_MAP_ID";
 
 type MappablePlace = Place & { lat: number; lng: number };
-const GOOGLE_PIN_RED = "#ea4335";
 
 // Frames the map around the places, or the user's area when there are none.
 const FitToPlaces = ({ places }: { places: MappablePlace[] }) => {
@@ -114,14 +113,12 @@ const PlaceMarker = ({ place, clusterer, markers, onSelect }: {
         return () => { clusterer.removeMarker(marker); markers.delete(id); };
     }, [clusterer, markers, id]);
     const color = place.tags[0]?.color;
-    // Visited: a paler fill with a check. Untagged pins start from Google's default red so they can be lightened too.
-    const base = color ?? GOOGLE_PIN_RED;
+    // A visited pin keeps its color and swaps the dot for a ✓ that reads on it (Google's default red takes white).
+    const glyphColor = place.visited ? (color ? readableOn(color) : "#ffffff") : color && "#ffffff";
     return (
         <AdvancedMarker ref={register} position={{ lat: place.lat, lng: place.lng }} title={place.title} onClick={() => onSelect(place.id)}>
             {/* A darker border keeps light tag colors visible against the map. */}
-            {place.visited
-                ? <Pin background={lighten(base)} borderColor={darken(base)} glyphColor={darken(base)} glyph="✓" />
-                : <Pin background={color} borderColor={color && darken(color)} glyphColor={color && "#ffffff"} />}
+            <Pin background={color} borderColor={color && darken(color)} glyphColor={glyphColor} glyph={place.visited ? "✓" : undefined} />
         </AdvancedMarker>
     );
 };

@@ -25,6 +25,8 @@ export const nextTagColor = (colors: string[]) => {
 export const darken = (hex: string, amount = 0.3) =>
     "#" + [1, 3, 5].map(i => Math.round(parseInt(hex.slice(i, i + 2), 16) * (1 - amount)).toString(16).padStart(2, "0")).join("");
 
-// Mixes a #rrggbb color toward white, for the paler fill of a visited place's pin.
-export const lighten = (hex: string, amount = 0.5) =>
-    "#" + [1, 3, 5].map(i => { const c = parseInt(hex.slice(i, i + 2), 16); return Math.round(c + (255 - c) * amount).toString(16).padStart(2, "0"); }).join("");
+// Near-black or white, whichever reads better on a #rrggbb fill (YIQ brightness), for the ✓ on a visited pin.
+export const readableOn = (hex: string) => {
+    const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
+    return (299 * r + 587 * g + 114 * b) / 1000 >= 150 ? "#1a1b1e" : "#ffffff";
+};
