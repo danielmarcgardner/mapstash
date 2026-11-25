@@ -13,6 +13,7 @@
   "dependencies": {
     "@googlemaps/markerclusterer": "^2.6.2",
     "@mantine/core": "^8.1.1",
+    "@mantine/dates": "^8.1.1",
     "@mantine/form": "^8.1.1",
     "@mantine/hooks": "^8.1.1",
     "@mantine/notifications": "^8.1.1",
@@ -21,6 +22,7 @@
     "@tabler/icons-react": "^3.34.0",
     "@tailwindcss/vite": "^4.1.10",
     "@vis.gl/react-google-maps": "^1.10.2",
+    "dayjs": "^1.11.23",
     "lucide-react": "^0.515.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
