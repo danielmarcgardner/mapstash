@@ -970,7 +970,14 @@ describe('Visited pins and filter', () => {
         expect(count('GET', '/api/places')).toBe(1);
     });
 
-    it('drops a place from "To visit" once it is marked visited', async () => {
+    it('leaves the counts off until places load, so a failed load does not read as zero', async () => {
+        renderDashboard(null, () => jsonResponse(500));
+        expect(await screen.findByRole('radio', { name: 'All' })).toBeInTheDocument();
+        expect(screen.getByRole('radio', { name: 'To visit' })).toBeInTheDocument();
+        expect(screen.getByRole('radio', { name: 'Visited' })).toBeInTheDocument();
+    });
+
+    it('drops a place from "To visit" once it is marked visited, keeping its details open', async () => {
         const { calls } = renderVisited();
         fireEvent.click(await screen.findByRole('radio', { name: 'To visit 2' }));
         await vi.waitFor(() => expect(markerTitles()).toEqual(['Place 2', 'Place 3']));
@@ -980,6 +987,10 @@ describe('Visited pins and filter', () => {
         await vi.waitFor(() => expect(markerTitles()).toEqual(['Place 3']));
         expect(placeQueries(calls)).toEqual(['', '?visited=false', '?visited=false']); // only the filtered list refetched
         expect(screen.getByRole('radio', { name: 'Visited 2' })).toBeInTheDocument();
+        // The drawer stays on the place, so the badge confirms what the user did.
+        const drawer = within(screen.getByRole('dialog'));
+        expect(drawer.getByText(/^Visited /)).toBeInTheDocument();
+        expect(drawer.getByText('Place 2')).toBeInTheDocument();
     });
 });
 
@@ -1152,6 +1163,14 @@ describe('Phone layout', () => {
         expect(burger).toHaveAttribute('aria-expanded', 'true'); // tags are multi-select, so stay open
 
         fireEvent.click(await screen.findByRole('button', { name: 'Brunch 0' }));
+        expect(burger).toHaveAttribute('aria-expanded', 'false');
+    });
+
+    it('closes the navigation after picking a visited filter', async () => {
+        renderDashboard([place(1)]);
+        const burger = await screen.findByRole('button', { name: 'Toggle navigation' });
+        fireEvent.click(burger);
+        fireEvent.click(await screen.findByRole('radio', { name: 'Visited 0' }));
         expect(burger).toHaveAttribute('aria-expanded', 'false');
     });
 

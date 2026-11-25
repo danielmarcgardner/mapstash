@@ -8,7 +8,7 @@ import type { Tag } from "../types/tag";
 import { useGetListsQuery } from "../state/api/listApi";
 import { useGetTagsQuery } from "../state/api/tagApi";
 import { useGetPlacesQuery } from "../state/api/placeApi";
-import type { VisitedFilter } from "./Dashboard";
+import type { VisitedFilter } from "../types/place";
 
 const LOAD_ERROR = 'Something went wrong. Please try again later.';
 
@@ -30,8 +30,10 @@ const SideBar = ({ tagFilter, onTagFilterChange, listFilter, onListFilterChange,
     const { data: lists = [], isLoading: listsLoading, isError: listsError } = useGetListsQuery();
     const { data: tags = [], isLoading: tagsLoading, isError: tagsError } = useGetTagsQuery();
     // Totals, like the tag and list counts; the unfiltered list is the map's own cache entry when nothing is filtered.
-    const { data: allPlaces = [] } = useGetPlacesQuery();
-    const visitedCount = allPlaces.filter(p => p.visited).length;
+    const { data: allPlaces } = useGetPlacesQuery();
+    const visitedCount = allPlaces?.filter(p => p.visited).length ?? 0;
+    // No counts until places load, so a failed or pending load doesn't read as zero.
+    const counted = (label: string, n: number) => (allPlaces ? `${label} ${n}` : label);
 
     return (
         <AppShell.Navbar p="xs">
@@ -41,9 +43,9 @@ const SideBar = ({ tagFilter, onTagFilterChange, listFilter, onListFilterChange,
                     value={visitedFilter}
                     onChange={value => onVisitedFilterChange(value as VisitedFilter)}
                     data={[
-                        { value: 'all', label: `All ${allPlaces.length}` },
-                        { value: 'to-visit', label: `To visit ${allPlaces.length - visitedCount}` },
-                        { value: 'visited', label: `Visited ${visitedCount}` },
+                        { value: 'all', label: counted('All', allPlaces?.length ?? 0) },
+                        { value: 'to-visit', label: counted('To visit', (allPlaces?.length ?? 0) - visitedCount) },
+                        { value: 'visited', label: counted('Visited', visitedCount) },
                     ]}
                 />
                 <Group justify="space-between" mb="xs">

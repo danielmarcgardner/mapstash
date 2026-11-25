@@ -8,7 +8,7 @@ import SideBar from "./SideBar";
 import PlaceDetail from "./PlaceDetail";
 import PlaceForm from "./PlaceForm";
 import { useGetPlacesQuery } from "../state/api/placeApi";
-import type { Place } from "../types/place";
+import type { Place, VisitedFilter } from "../types/place";
 import { darken, lighten } from "../tagColors";
 
 const DEFAULT_CENTER = { lat: 33.7501, lng: -84.3885 }; // Atlanta
@@ -17,7 +17,6 @@ const SINGLE_PLACE_ZOOM = 14;
 const MAP_ID = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID || "DEMO_MAP_ID";
 
 type MappablePlace = Place & { lat: number; lng: number };
-export type VisitedFilter = 'all' | 'to-visit' | 'visited';
 const GOOGLE_PIN_RED = "#ea4335";
 
 // Frames the map around the places, or the user's area when there are none.
@@ -159,8 +158,12 @@ const Dashboard = () => {
         [places],
     );
     const [selectedId, setSelectedId] = useState<number | null>(null);
+    // The sidebar keeps the unfiltered list loaded; falling back to it keeps the details open on a place
+    // that just left the filter (e.g. marked visited under "To visit").
+    const { data: allPlaces } = useGetPlacesQuery();
     // Derived from query data, so a deleted place deselects itself after the refetch.
-    const selectedPlace = mappable.find(p => p.id === selectedId);
+    const selectedPlace = mappable.find(p => p.id === selectedId)
+        ?? allPlaces?.find((p): p is MappablePlace => p.id === selectedId && p.lat !== null && p.lng !== null);
     const [formPlace, setFormPlace] = useState<Place | "new" | null>(null);
     // On a phone the navbar covers the map, so close it once a choice should show on the map.
     const [navOpened, nav] = useDisclosure();
@@ -170,7 +173,7 @@ const Dashboard = () => {
             <SideBar
                 tagFilter={tagFilter} onTagFilterChange={setTagFilter}
                 listFilter={listFilter} onListFilterChange={id => { setListFilter(id); nav.close(); }}
-                visitedFilter={visitedFilter} onVisitedFilterChange={setVisitedFilter}
+                visitedFilter={visitedFilter} onVisitedFilterChange={f => { setVisitedFilter(f); nav.close(); }}
             />
 
             <AppShell.Main className="p-0">
