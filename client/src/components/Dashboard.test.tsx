@@ -5,7 +5,7 @@ import Dashboard from './Dashboard';
 import { jsonResponse, stubFetch, type Route } from '../test/fetchStub';
 import { renderWithStore } from '../test/renderWithStore';
 import { baseApi } from '../state/api/baseApi';
-import { darken, TAG_PALETTE } from '../tagColors';
+import { darken, lighten, TAG_PALETTE } from '../tagColors';
 import dayjs from 'dayjs';
 
 // jsdom can't run Google Maps, so the library is replaced with inspectable stand-ins.
@@ -36,8 +36,9 @@ vi.mock('@vis.gl/react-google-maps', async () => {
         const register = useCallback((el: HTMLButtonElement | null) => ref?.(el && Object.assign(el, { position })), [ref]); // eslint-disable-line react-hooks/exhaustive-deps
         return <button ref={register} data-testid="marker" title={title} onClick={onClick}>{children}</button>;
     },
-    Pin: ({ background, borderColor, glyphColor }: { background?: string; borderColor?: string; glyphColor?: string }) => (
-        <span data-testid="pin" data-background={background ?? ''} data-border={borderColor ?? ''} data-glyph={glyphColor ?? ''} />
+    Pin: ({ background, borderColor, glyphColor, glyph }: { background?: string; borderColor?: string; glyphColor?: string; glyph?: string }) => (
+        <span data-testid="pin" data-background={background ?? ''} data-border={borderColor ?? ''} data-glyph={glyphColor ?? ''}
+            {...(glyph && { 'data-glyph-text': glyph })} />
     ),
     useMap: () => map,
     useMapsLibrary: () => placesLib,
@@ -882,9 +883,114 @@ describe('Tag filter and management', () => {
 
         await vi.waitFor(() => expect(screen.queryByRole('button', { name: /^Coffee\b/ })).not.toBeInTheDocument());
         expect(count('DELETE', '/api/tags/1')).toBe(1);
-        // The filter dropped the deleted tag, so every place shows again.
+        // The filter dropped the deleted tag, so every place shows again from a fresh unfiltered list.
+        // (The sidebar's counts keep that list subscribed, so it can refetch before the stale tag list does.)
         await vi.waitFor(() => expect(screen.getAllByTestId('marker')).toHaveLength(3));
-        expect(placeQueries(calls).slice(-1)).toEqual(['']);
+        const afterDelete = calls.slice(calls.findIndex(c => c.method === 'DELETE'));
+        expect(placeQueries(afterDelete)).toContain('');
+    });
+});
+
+describe('Visited pins and filter', () => {
+    const coffee = { id: 1, name: 'Coffee', color: '#ff8800' };
+    const visited = { visited: true, visited_on: '2024-03-04' };
+    const startPlaces = () => [place(1, { ...visited, tags: [coffee] }), place(2, { tags: [coffee] }), place(3)];
+    // Answers like the API: visited and tag_ids filters, with visit calls applied to the shared rows.
+    const renderVisited = () => {
+        let rows = startPlaces();
+        const placesFor = (_body: unknown, url: URL) => {
+            const v = url.searchParams.get('visited');
+            const tagIds = url.searchParams.getAll('tag_ids[]').map(Number);
+            return rows.filter(p => (v === null || p.visited === (v === 'true'))
+                && (!tagIds.length || (p.tags as { id: number }[]).some(t => tagIds.includes(t.id))));
+        };
+        return renderDashboard(null, placesFor, {
+            'GET /api/tags': () => [{ ...coffee, places_count: 2 }],
+            'POST /api/places/2/visit': (body) => {
+                const { visited_on } = body as { visited_on: string };
+                rows = rows.map(p => (p.id === 2 ? { ...p, visited: true, visited_on } : p));
+                return rows.find(p => p.id === 2);
+            },
+        });
+    };
+    const placeQueries = (calls: { method: string; path: string; query: string }[]) =>
+        calls.filter(c => c.method === 'GET' && c.path === '/api/places').map(c => c.query);
+    const markerTitles = () => screen.getAllByTestId('marker').map(m => m.title);
+    const pinOf = (title: string) => screen.getAllByTestId('marker').find(m => m.title === title)!.querySelector('[data-testid="pin"]') as HTMLElement;
+
+    it('gives visited pins a check glyph and a lighter fill, tagged or not, and leaves unvisited pins alone', async () => {
+        renderDashboard([place(1, { ...visited, tags: [coffee] }), place(2, visited), place(3, { tags: [coffee] })]);
+        await screen.findAllByTestId('marker');
+        expect({ ...pinOf('Place 1').dataset }).toEqual({
+            testid: 'pin', background: lighten('#ff8800'), border: darken('#ff8800'), glyph: darken('#ff8800'), glyphText: '✓',
+        });
+        expect({ ...pinOf('Place 2').dataset }).toEqual({
+            testid: 'pin', background: lighten('#ea4335'), border: darken('#ea4335'), glyph: darken('#ea4335'), glyphText: '✓',
+        });
+        expect({ ...pinOf('Place 3').dataset }).toEqual({ testid: 'pin', background: '#ff8800', border: darken('#ff8800'), glyph: '#ffffff' });
+    });
+
+    it('shows All / To visit / Visited with counts', async () => {
+        renderVisited();
+        expect(await screen.findByRole('radio', { name: 'All 3' })).toBeChecked();
+        expect(screen.getByRole('radio', { name: 'To visit 2' })).toBeInTheDocument();
+        expect(screen.getByRole('radio', { name: 'Visited 1' })).toBeInTheDocument();
+    });
+
+    it('filters the map to visited or unvisited places, and back to all', async () => {
+        const { calls } = renderVisited();
+        expect(await screen.findAllByTestId('marker')).toHaveLength(3);
+
+        fireEvent.click(await screen.findByRole('radio', { name: 'Visited 1' }));
+        await vi.waitFor(() => expect(markerTitles()).toEqual(['Place 1']));
+        fireEvent.click(screen.getByRole('radio', { name: 'To visit 2' }));
+        await vi.waitFor(() => expect(markerTitles()).toEqual(['Place 2', 'Place 3']));
+        fireEvent.click(screen.getByRole('radio', { name: 'All 3' }));
+        await vi.waitFor(() => expect(screen.getAllByTestId('marker')).toHaveLength(3));
+
+        expect(placeQueries(calls)).toEqual(['', '?visited=true', '?visited=false']); // "All" is still cached
+    });
+
+    it('combines the visited filter with the tag filter', async () => {
+        const { calls } = renderVisited();
+        fireEvent.click(await screen.findByRole('button', { name: 'Coffee 2' }));
+        fireEvent.click(await screen.findByRole('radio', { name: 'To visit 2' }));
+        await vi.waitFor(() => expect(placeQueries(calls).slice(-1)).toEqual(['?tag_ids[]=1&visited=false']));
+        await vi.waitFor(() => expect(markerTitles()).toEqual(['Place 2']));
+    });
+
+    it('updates the pin and the counts without a reload when a place is marked visited', async () => {
+        const { count } = renderVisited();
+        fireEvent.click((await screen.findAllByTestId('marker')).find(m => m.title === 'Place 2')!);
+        fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Mark visited' }));
+
+        await vi.waitFor(() => expect(pinOf('Place 2').dataset.glyphText).toBe('✓'));
+        expect(screen.getByRole('radio', { name: 'To visit 1' })).toBeInTheDocument();
+        expect(screen.getByRole('radio', { name: 'Visited 2' })).toBeInTheDocument();
+        expect(count('GET', '/api/places')).toBe(1);
+    });
+
+    it('leaves the counts off until places load, so a failed load does not read as zero', async () => {
+        renderDashboard(null, () => jsonResponse(500));
+        expect(await screen.findByRole('radio', { name: 'All' })).toBeInTheDocument();
+        expect(screen.getByRole('radio', { name: 'To visit' })).toBeInTheDocument();
+        expect(screen.getByRole('radio', { name: 'Visited' })).toBeInTheDocument();
+    });
+
+    it('drops a place from "To visit" once it is marked visited, keeping its details open', async () => {
+        const { calls } = renderVisited();
+        fireEvent.click(await screen.findByRole('radio', { name: 'To visit 2' }));
+        await vi.waitFor(() => expect(markerTitles()).toEqual(['Place 2', 'Place 3']));
+        fireEvent.click(screen.getAllByTestId('marker').find(m => m.title === 'Place 2')!);
+        fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Mark visited' }));
+
+        await vi.waitFor(() => expect(markerTitles()).toEqual(['Place 3']));
+        expect(placeQueries(calls)).toEqual(['', '?visited=false', '?visited=false']); // only the filtered list refetched
+        expect(screen.getByRole('radio', { name: 'Visited 2' })).toBeInTheDocument();
+        // The drawer stays on the place, so the badge confirms what the user did.
+        const drawer = within(screen.getByRole('dialog'));
+        expect(drawer.getByText(/^Visited /)).toBeInTheDocument();
+        expect(drawer.getByText('Place 2')).toBeInTheDocument();
     });
 });
 
@@ -1057,6 +1163,14 @@ describe('Phone layout', () => {
         expect(burger).toHaveAttribute('aria-expanded', 'true'); // tags are multi-select, so stay open
 
         fireEvent.click(await screen.findByRole('button', { name: 'Brunch 0' }));
+        expect(burger).toHaveAttribute('aria-expanded', 'false');
+    });
+
+    it('closes the navigation after picking a visited filter', async () => {
+        renderDashboard([place(1)]);
+        const burger = await screen.findByRole('button', { name: 'Toggle navigation' });
+        fireEvent.click(burger);
+        fireEvent.click(await screen.findByRole('radio', { name: 'Visited 0' }));
         expect(burger).toHaveAttribute('aria-expanded', 'false');
     });
 

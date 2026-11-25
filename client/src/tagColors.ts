@@ -24,3 +24,7 @@ export const nextTagColor = (colors: string[]) => {
 // Mixes a #rrggbb color toward black, for a pin border that separates it from the map.
 export const darken = (hex: string, amount = 0.3) =>
     "#" + [1, 3, 5].map(i => Math.round(parseInt(hex.slice(i, i + 2), 16) * (1 - amount)).toString(16).padStart(2, "0")).join("");
+
+// Mixes a #rrggbb color toward white, for the paler fill of a visited place's pin.
+export const lighten = (hex: string, amount = 0.5) =>
+    "#" + [1, 3, 5].map(i => { const c = parseInt(hex.slice(i, i + 2), 16); return Math.round(c + (255 - c) * amount).toString(16).padStart(2, "0"); }).join("");

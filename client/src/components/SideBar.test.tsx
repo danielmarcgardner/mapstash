@@ -16,7 +16,8 @@ const renderSideBar = () => {
         <MantineProvider>
             <Provider store={store}>
                 <AppShell navbar={{ width: 200, breakpoint: 'sm' }}>
-                    <SideBar tagFilter={[]} onTagFilterChange={() => {}} listFilter={null} onListFilterChange={() => {}} />
+                    <SideBar tagFilter={[]} onTagFilterChange={() => {}} listFilter={null} onListFilterChange={() => {}}
+                        visitedFilter="all" onVisitedFilterChange={() => {}} />
                 </AppShell>
             </Provider>
         </MantineProvider>,

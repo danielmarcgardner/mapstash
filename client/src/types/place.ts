@@ -34,4 +34,6 @@ type CreatePlacePayload = Partial<Omit<Place, 'id' | 'title' | 'lat' | 'lng' | '
 
 type UpdatePlacePayload = Partial<CreatePlacePayload>;
 
-export type { Place, PlaceTag, CreatePlacePayload, UpdatePlacePayload };
+type VisitedFilter = 'all' | 'to-visit' | 'visited';
+
+export type { Place, PlaceTag, CreatePlacePayload, UpdatePlacePayload, VisitedFilter };

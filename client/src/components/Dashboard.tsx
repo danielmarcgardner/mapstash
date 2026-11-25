@@ -8,8 +8,8 @@ import SideBar from "./SideBar";
 import PlaceDetail from "./PlaceDetail";
 import PlaceForm from "./PlaceForm";
 import { useGetPlacesQuery } from "../state/api/placeApi";
-import type { Place } from "../types/place";
-import { darken } from "../tagColors";
+import type { Place, VisitedFilter } from "../types/place";
+import { darken, lighten } from "../tagColors";
 
 const DEFAULT_CENTER = { lat: 33.7501, lng: -84.3885 }; // Atlanta
 const SINGLE_PLACE_ZOOM = 14;
@@ -17,6 +17,7 @@ const SINGLE_PLACE_ZOOM = 14;
 const MAP_ID = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID || "DEMO_MAP_ID";
 
 type MappablePlace = Place & { lat: number; lng: number };
+const GOOGLE_PIN_RED = "#ea4335";
 
 // Frames the map around the places, or the user's area when there are none.
 const FitToPlaces = ({ places }: { places: MappablePlace[] }) => {
@@ -113,10 +114,14 @@ const PlaceMarker = ({ place, clusterer, markers, onSelect }: {
         return () => { clusterer.removeMarker(marker); markers.delete(id); };
     }, [clusterer, markers, id]);
     const color = place.tags[0]?.color;
+    // Visited: a paler fill with a check. Untagged pins start from Google's default red so they can be lightened too.
+    const base = color ?? GOOGLE_PIN_RED;
     return (
         <AdvancedMarker ref={register} position={{ lat: place.lat, lng: place.lng }} title={place.title} onClick={() => onSelect(place.id)}>
             {/* A darker border keeps light tag colors visible against the map. */}
-            <Pin background={color} borderColor={color && darken(color)} glyphColor={color && "#ffffff"} />
+            {place.visited
+                ? <Pin background={lighten(base)} borderColor={darken(base)} glyphColor={darken(base)} glyph="✓" />
+                : <Pin background={color} borderColor={color && darken(color)} glyphColor={color && "#ffffff"} />}
         </AdvancedMarker>
     );
 };
@@ -139,24 +144,37 @@ const MapOverlay = ({ children, alert = false }: { children: React.ReactNode; al
 const Dashboard = () => {
     const [tagFilter, setTagFilter] = useState<number[]>([]);
     const [listFilter, setListFilter] = useState<number | null>(null);
-    const filtered = tagFilter.length > 0 || listFilter !== null;
+    const [visitedFilter, setVisitedFilter] = useState<VisitedFilter>('all');
+    const filtered = tagFilter.length > 0 || listFilter !== null || visitedFilter !== 'all';
     const { data: places, isLoading, isFetching, isError, isSuccess } = useGetPlacesQuery(
-        filtered ? { tag_ids: tagFilter, list_id: listFilter ?? undefined } : undefined,
+        filtered ? {
+            tag_ids: tagFilter,
+            list_id: listFilter ?? undefined,
+            visited: visitedFilter === 'all' ? undefined : visitedFilter === 'visited',
+        } : undefined,
     );
     const mappable = useMemo(
         () => (places ?? []).filter((p): p is MappablePlace => p.lat !== null && p.lng !== null),
         [places],
     );
     const [selectedId, setSelectedId] = useState<number | null>(null);
+    // The sidebar keeps the unfiltered list loaded; falling back to it keeps the details open on a place
+    // that just left the filter (e.g. marked visited under "To visit").
+    const { data: allPlaces } = useGetPlacesQuery();
     // Derived from query data, so a deleted place deselects itself after the refetch.
-    const selectedPlace = mappable.find(p => p.id === selectedId);
+    const selectedPlace = mappable.find(p => p.id === selectedId)
+        ?? allPlaces?.find((p): p is MappablePlace => p.id === selectedId && p.lat !== null && p.lng !== null);
     const [formPlace, setFormPlace] = useState<Place | "new" | null>(null);
     // On a phone the navbar covers the map, so close it once a choice should show on the map.
     const [navOpened, nav] = useDisclosure();
 
     return (
         <AppShellComponent onAddPlace={() => setFormPlace("new")} navOpened={navOpened} onToggleNav={nav.toggle}>
-            <SideBar tagFilter={tagFilter} onTagFilterChange={setTagFilter} listFilter={listFilter} onListFilterChange={id => { setListFilter(id); nav.close(); }} />
+            <SideBar
+                tagFilter={tagFilter} onTagFilterChange={setTagFilter}
+                listFilter={listFilter} onListFilterChange={id => { setListFilter(id); nav.close(); }}
+                visitedFilter={visitedFilter} onVisitedFilterChange={f => { setVisitedFilter(f); nav.close(); }}
+            />
 
             <AppShell.Main className="p-0">
                 <div className="relative w-full h-[calc(100vh-60px)]">
