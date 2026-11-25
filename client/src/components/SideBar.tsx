@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ActionIcon, AppShell, Button, Group, ScrollArea, Title } from "@mantine/core";
+import { ActionIcon, AppShell, Button, Group, ScrollArea, SegmentedControl, Title } from "@mantine/core";
 import { IconPencil, IconPlus } from "@tabler/icons-react";
 import ListEditor from "./ListEditor";
 import TagEditor from "./TagEditor";
@@ -7,6 +7,8 @@ import type { List } from "../types/list";
 import type { Tag } from "../types/tag";
 import { useGetListsQuery } from "../state/api/listApi";
 import { useGetTagsQuery } from "../state/api/tagApi";
+import { useGetPlacesQuery } from "../state/api/placeApi";
+import type { VisitedFilter } from "./Dashboard";
 
 const LOAD_ERROR = 'Something went wrong. Please try again later.';
 
@@ -15,9 +17,11 @@ type Props = {
     onTagFilterChange: (ids: number[]) => void;
     listFilter: number | null;
     onListFilterChange: (id: number | null) => void;
+    visitedFilter: VisitedFilter;
+    onVisitedFilterChange: (filter: VisitedFilter) => void;
 };
 
-const SideBar = ({ tagFilter, onTagFilterChange, listFilter, onListFilterChange }: Props) => {
+const SideBar = ({ tagFilter, onTagFilterChange, listFilter, onListFilterChange, visitedFilter, onVisitedFilterChange }: Props) => {
     const [editing, setEditing] = useState<Tag | null>(null);
     const [editingList, setEditingList] = useState<List | "new" | null>(null);
     const toggle = (id: number) =>
@@ -25,10 +29,23 @@ const SideBar = ({ tagFilter, onTagFilterChange, listFilter, onListFilterChange 
 
     const { data: lists = [], isLoading: listsLoading, isError: listsError } = useGetListsQuery();
     const { data: tags = [], isLoading: tagsLoading, isError: tagsError } = useGetTagsQuery();
+    // Totals, like the tag and list counts; the unfiltered list is the map's own cache entry when nothing is filtered.
+    const { data: allPlaces = [] } = useGetPlacesQuery();
+    const visitedCount = allPlaces.filter(p => p.visited).length;
 
     return (
         <AppShell.Navbar p="xs">
             <ScrollArea className="h-full">
+                <SegmentedControl
+                    fullWidth size="xs" mb="sm" aria-label="Visited filter"
+                    value={visitedFilter}
+                    onChange={value => onVisitedFilterChange(value as VisitedFilter)}
+                    data={[
+                        { value: 'all', label: `All ${allPlaces.length}` },
+                        { value: 'to-visit', label: `To visit ${allPlaces.length - visitedCount}` },
+                        { value: 'visited', label: `Visited ${visitedCount}` },
+                    ]}
+                />
                 <Group justify="space-between" mb="xs">
                     <Title order={5}>Your Lists</Title>
                     <ActionIcon size="sm" variant="subtle" color="gray" aria-label="New list" onClick={() => setEditingList("new")}>
