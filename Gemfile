@@ -17,7 +17,7 @@ gem "tzinfo-data", platforms: %i[ windows jruby ]
 
 # Error monitoring, tracing and logs [https://docs.sentry.io/platforms/ruby/guides/rails/]
 gem "sentry-ruby", "~> 7.2"
-gem "sentry-rails", "~> 7.2"
+gem "sentry-rails", "~> 7.3"
 
 # Use the database-backed adapters for Rails.cache, Active Job, and Action Cable
 gem "solid_cache"
