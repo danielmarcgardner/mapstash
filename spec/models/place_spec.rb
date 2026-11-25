@@ -63,24 +63,26 @@ RSpec.describe Place, type: :model do
   end
 
   describe "validations" do
-    it "accepts a visited_on of today, a past date or nil" do
-      [ Date.current, Date.new(2020, 1, 1), nil ].each do |date|
+    it "accepts a visited_on of tomorrow, today, a past date or nil" do
+      [ Date.tomorrow, Date.current, Date.new(2020, 1, 1), nil ].each do |date|
         expect(build(:place, visited_on: date)).to be_valid, "expected #{date.inspect} to be valid"
       end
     end
 
-    it "rejects a visited_on in the future" do
-      place = build(:place, visited_on: Date.tomorrow)
+    it "rejects a visited_on past tomorrow" do
+      place = build(:place, visited_on: Date.current + 2)
 
       expect(place).not_to be_valid
       expect(place.errors[:visited_on]).to eq([ "can't be in the future" ])
     end
 
     it "rejects a visited_on that isn't a date" do
-      place = build(:place, visited_on: "junk")
+      [ "junk", 20260101, [ "2026-01-02" ] ].each do |value|
+        place = build(:place, visited_on: value)
 
-      expect(place).not_to be_valid
-      expect(place.errors[:visited_on]).to eq([ "is not a valid date" ])
+        expect(place).not_to be_valid, "expected #{value.inspect} to be invalid"
+        expect(place.errors[:visited_on]).to eq([ "is not a valid date" ])
+      end
     end
 
     %i[title lat lng].each do |attr|

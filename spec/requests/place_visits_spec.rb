@@ -24,8 +24,15 @@ RSpec.describe "Place visits", type: :request do
       expect(place.reload.visited_on).to eq(Date.new(2026, 1, 2))
     end
 
-    it "returns 422 for a future date and stores nothing" do
+    it "accepts tomorrow, so a user ahead of UTC can send their local today" do
       visit_place(place.id, visited_on: Date.tomorrow.iso8601)
+
+      expect(response).to have_http_status(:ok)
+      expect(place.reload.visited_on).to eq(Date.tomorrow)
+    end
+
+    it "returns 422 for a date past tomorrow and stores nothing" do
+      visit_place(place.id, visited_on: (Date.current + 2).iso8601)
 
       expect(response).to have_http_status(:unprocessable_content)
       expect(response.parsed_body).to eq("errors" => [ "Visited on can't be in the future" ])
@@ -40,6 +47,16 @@ RSpec.describe "Place visits", type: :request do
       expect(response).to have_http_status(:unprocessable_content)
       expect(response.parsed_body).to eq("errors" => [ "Visited on is not a valid date" ])
       expect(place.reload.visited_on).to eq(Date.new(2026, 3, 4))
+    end
+
+    it "returns 422, not 500, for a number or an array" do
+      [ 20260101, [ "2026-01-02" ] ].each do |value|
+        visit_place(place.id, visited_on: value)
+
+        expect(response).to have_http_status(:unprocessable_content), "expected 422 for #{value.inspect}"
+        expect(response.parsed_body).to eq("errors" => [ "Visited on is not a valid date" ])
+      end
+      expect(place.reload.visited_on).to be_nil
     end
 
     it "returns 404 for another user's place and leaves it unvisited" do

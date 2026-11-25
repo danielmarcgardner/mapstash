@@ -5,11 +5,9 @@ module Api
     before_action :authenticate_user!
     before_action :set_place
 
-    # update_columns keeps updated_at unchanged and skips validations, so validate! runs first (422 via RecordInvalid).
     def create
       @place.visited_on = params[:visited_on].presence || Date.current
-      @place.validate!
-      @place.update_columns(visited_on: @place.visited_on)
+      @place.save!(touch: false)
       render json: @place, status: :ok
     end
 

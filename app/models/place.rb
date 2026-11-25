@@ -47,10 +47,11 @@ class Place < ApplicationRecord
   private
 
   def visited_on_is_a_past_date
-    # A string that doesn't parse casts to nil; without this it would silently clear the visit.
-    if visited_on.nil? && visited_on_before_type_cast.present?
+    # Anything that doesn't cast to a Date (junk string, number, array) would otherwise clear the visit or raise.
+    if visited_on_before_type_cast.present? && !visited_on.is_a?(Date)
       errors.add(:visited_on, "is not a valid date")
-    elsif visited_on&.after?(Date.current)
+    # One day of slack: Date.current is UTC, and a user ahead of UTC may already be on tomorrow.
+    elsif visited_on&.after?(Date.tomorrow)
       errors.add(:visited_on, "can't be in the future")
     end
   end
