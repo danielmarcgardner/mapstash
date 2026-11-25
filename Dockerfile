@@ -20,7 +20,7 @@ RUN --mount=type=secret,id=sentry_auth_token \
     SENTRY_AUTH_TOKEN="$(cat /run/secrets/sentry_auth_token 2>/dev/null)" npm run build
 
 # === Stage 2: Rails API ===
-FROM ruby:4.0.9 AS backend
+FROM ruby:4.0.10 AS backend
 WORKDIR /app
 # Production gems only; the client is already built in stage 1, so no Node here.
 ENV RAILS_ENV=production BUNDLE_WITHOUT="development:test"
