@@ -338,7 +338,7 @@ describe('Place details', () => {
             const label = `Visited ${dayjs().toDate().toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
             expect(await drawer.findByText(label)).toBeInTheDocument();
             expect(calls.find(c => c.method === 'POST')?.body).toEqual({ visited_on: today });
-            expect(count('GET', '/api/places')).toBe(2); // refetched, not reloaded
+            expect(count('GET', '/api/places')).toBe(1); // the returned place is written into the cache, no refetch
             expect(drawer.queryByRole('button', { name: 'Mark visited' })).not.toBeInTheDocument();
         });
 

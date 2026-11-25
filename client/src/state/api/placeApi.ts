@@ -27,14 +27,13 @@ export const placeApi = baseApi.injectEndpoints({
             query: ({ id, ...place }) => ({ url: `/api/places/${id}`, method: 'PATCH', body: { place } }),
             invalidatesTags: [...placeChanged],
         }),
-        // A visit only changes the place itself, so tag and list counts don't refetch.
         markVisited: builder.mutation<Place, { id: number; visited_on?: string }>({
             query: ({ id, visited_on }) => ({ url: `/api/places/${id}/visit`, method: 'POST', body: { visited_on } }),
-            invalidatesTags: (_result, _error, { id }) => [{ type: 'Place', id }],
+            onQueryStarted: (_arg, api) => writeVisitedPlace(api),
         }),
         clearVisited: builder.mutation<Place, number>({
             query: (id) => ({ url: `/api/places/${id}/visit`, method: 'DELETE' }),
-            invalidatesTags: (_result, _error, id) => [{ type: 'Place', id }],
+            onQueryStarted: (_arg, api) => writeVisitedPlace(api),
         }),
         deletePlace: builder.mutation<void, number>({
             query: (id) => ({ url: `/api/places/${id}`, method: 'DELETE' }),
@@ -42,6 +41,23 @@ export const placeApi = baseApi.injectEndpoints({
         }),
     }),
 });
+
+// A visit returns the updated place, so it's written into every cached place list instead of refetching them all.
+// shortcut: assumes a visit never changes which lists a place is in; once getPlaces filters on visited (story 33), refetch those.
+async function writeVisitedPlace({ dispatch, getState, queryFulfilled }: {
+    dispatch: (action: unknown) => unknown; getState: () => unknown; queryFulfilled: Promise<{ data: Place }>;
+}) {
+    const { data } = await queryFulfilled.catch(() => ({ data: null }));
+    if (!data) return; // the component shows the error
+    const state = getState() as Parameters<typeof placeApi.util.selectInvalidatedBy>[0];
+    for (const { endpointName, originalArgs } of placeApi.util.selectInvalidatedBy(state, [{ type: 'Place', id: data.id }])) {
+        if (endpointName !== 'getPlaces') continue;
+        dispatch(placeApi.util.updateQueryData('getPlaces', originalArgs, places => {
+            const i = places.findIndex(p => p.id === data.id);
+            if (i >= 0) places[i] = data;
+        }));
+    }
+}
 
 export const {
     useGetPlacesQuery,
